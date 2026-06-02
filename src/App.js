@@ -280,7 +280,16 @@ const App = () => {
                 ])),
             ]),
         ]),
-        h('footer', { className: 'border-t border-slate-200 bg-white px-6 py-6 text-center text-sm text-slate-500', key: 'footer' }, 'CSDM Service Model Visualizer · Browser-only public static application'),
+        h('footer', { className: 'border-t border-slate-200 bg-white px-6 py-6 text-center text-sm text-slate-500', key: 'footer' }, [
+            'CSDM Service Model Visualizer · Built by Enamul Haque · ',
+            h('a', {
+                href: 'https://www.linkedin.com/in/haquenam/',
+                target: '_blank',
+                rel: 'noopener noreferrer',
+                className: 'font-medium text-blue-700 underline-offset-4 hover:text-blue-800 hover:underline',
+                key: 'linkedin',
+            }, 'LinkedIn'),
+        ]),
     ]);
 };
 ReactDOM.createRoot(document.getElementById('root')).render(h(App));
