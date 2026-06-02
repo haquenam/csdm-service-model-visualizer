@@ -1,0 +1,11 @@
+{
+  "name": "csdm-service-model-visualizer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build && npx serve dist",
+    "build": "node scripts/build.mjs",
+    "preview": "npx serve dist"
+  }
+}
