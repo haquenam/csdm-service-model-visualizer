@@ -311,26 +311,6 @@ Potential future enhancements are listed below.
 | Phase 3 | Add ServiceNow import preparation guidance                             |
 | Phase 4 | Add optional AI assisted recommendations                               |
 | Phase 4 | Add a ServiceNow scoped application version                            |
-
-## Suggested Screenshot Folder
-
-Store README images in the following folder.
-
-```text
-docs/screenshots/
-```
-
-Recommended filenames are listed below.
-
-```text
-01-home-workflow.png
-02-upload-workspace.png
-03-analysis-summary.png
-04-relationship-diagram.png
-05-parsed-records.png
-06-footer-branding.png
-```
-
 ## Author
 
 Built by Enamul Haque.
