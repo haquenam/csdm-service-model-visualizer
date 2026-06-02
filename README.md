@@ -14,35 +14,28 @@ LinkedIn
 
 https://www.linkedin.com/in/haquenam/
 
+GitHub
+
+https://github.com/haquenam
+
 ## Purpose
 
 Many ServiceNow CSDM and CMDB initiatives begin with service mapping data in spreadsheets. Before that data is imported, governed, or operationalized, architects need a simple way to inspect whether the model is complete enough for review.
 
-This tool provides a lightweight, public, browser based review workspace that allows users to:
-
-| Capability                 | Description                                                                            |
-| -------------------------- | -------------------------------------------------------------------------------------- |
-| Upload a CSV               | Select a structured CSDM service model CSV file                                        |
-| Confirm file selection     | Review the selected file before running analysis                                       |
-| Run analysis intentionally | Parse and validate the file only after the user clicks Run Analysis                    |
-| Review readiness           | See a CSDM readiness score and validation summary                                      |
-| Identify gaps              | Highlight missing owners, support groups, service instances, offerings, and duplicates |
-| Visualize relationships    | Generate a CSDM relationship diagram                                                   |
-| Review parsed data         | Inspect uploaded CSV records in a table                                                |
-| Export findings            | Download a Markdown report for review or documentation                                 |
+This tool provides a lightweight, public, browser based review workspace that allows users to upload a CSV file, confirm the selected file, run analysis intentionally, review CSDM readiness, identify data gaps, visualize relationships, inspect parsed records, and export a Markdown report.
 
 ## Current User Journey
 
-The application follows a controlled review workflow:
+The application follows a controlled review workflow.
 
-| Step | Action                |
-| ---- | --------------------- |
-| 1    | Upload CSV            |
-| 2    | Confirm selected file |
-| 3    | Run Analysis          |
-| 4    | Review results        |
+| Step | Action                | Outcome                                                                              |
+| ---- | --------------------- | ------------------------------------------------------------------------------------ |
+| 1    | Upload CSV            | User selects a structured CSDM CSV file                                              |
+| 2    | Confirm selected file | The selected file name is shown before analysis                                      |
+| 3    | Run Analysis          | The CSV is parsed and validated in the browser                                       |
+| 4    | Review results        | Readiness score, validation gaps, diagram, records, and export options are displayed |
 
-This staged flow is intentional. It prevents the application from immediately parsing the file as soon as it is selected and gives users a more controlled architecture review experience.
+This staged flow is intentional. It prevents the application from immediately parsing a file as soon as it is selected and gives users a more controlled architecture review experience.
 
 ## Data Privacy And Safety
 
@@ -58,13 +51,15 @@ The public version should be used with sample, synthetic, anonymized, or non sen
 
 This tool is for educational and architecture review purposes only.
 
-It is not an official ServiceNow product. It is not a replacement for formal CSDM design, CMDB governance, data protection review, ServiceNow import validation, security review, or production implementation assurance.
+It is not an official ServiceNow product. It is not affiliated with, endorsed by, or sponsored by ServiceNow.
+
+It is not a replacement for formal CSDM design, CMDB governance, data protection review, ServiceNow import validation, security review, or production implementation assurance.
 
 All outputs should be reviewed by qualified ServiceNow architects, enterprise architects, platform owners, or governance stakeholders before use in any formal delivery context.
 
 ## CSDM Relationship Model
 
-The current version visualizes a simplified CSDM relationship chain:
+The current version visualizes a simplified CSDM relationship chain.
 
 ```text
 Business Application
@@ -80,7 +75,7 @@ This model is intended to help users understand how application and service data
 
 ## Required CSV Columns
 
-The CSV file must contain these exact column names:
+The CSV file must contain these exact column names.
 
 | Column Name                  | Description                                                               |
 | ---------------------------- | ------------------------------------------------------------------------- |
@@ -104,7 +99,7 @@ ServiceNow,ServiceNow Production,ServiceNow Platform Support,Enterprise Platform
 
 ## Validation Rules
 
-The application currently checks for:
+The application currently checks for the following validation indicators.
 
 | Validation Check                   | Description                                    |
 | ---------------------------------- | ---------------------------------------------- |
@@ -131,53 +126,29 @@ The score is intended as a quick review signal, not a formal maturity assessment
 
 ## Screenshots
 
-Add screenshots to the repository under:
-
-```text
-docs/screenshots/
-```
-
-Suggested screenshot filenames:
-
-```text
-docs/screenshots/01-home-workflow.png
-docs/screenshots/02-upload-workspace.png
-docs/screenshots/03-analysis-summary.png
-docs/screenshots/04-relationship-diagram.png
-docs/screenshots/05-parsed-records.png
-```
-
-Then reference them here:
-
 ### Home And Workflow
 
-```markdown
 ![Home and workflow](docs/screenshots/01-home-workflow.png)
-```
 
 ### Controlled Upload Workspace
 
-```markdown
 ![Controlled upload workspace](docs/screenshots/02-upload-workspace.png)
-```
 
 ### Analysis Summary
 
-```markdown
 ![Analysis summary](docs/screenshots/03-analysis-summary.png)
-```
 
 ### CSDM Relationship Diagram
 
-```markdown
 ![CSDM relationship diagram](docs/screenshots/04-relationship-diagram.png)
-```
 
 ### Parsed CSV Records
 
-```markdown
 ![Parsed CSV records](docs/screenshots/05-parsed-records.png)
-```
+
+### Footer Branding
+
+![Footer branding](docs/screenshots/06-footer-branding.png)
 
 ## Technology Stack
 
@@ -203,10 +174,11 @@ User Browser
     ↓
 Browser Local Processing
     |
-    | Parse CSV
+    | Confirm selected file
+    | Parse CSV after Run Analysis
     | Validate required fields
     | Calculate readiness score
-    | Generate diagram
+    | Generate relationship diagram
     ↓
 Results Displayed In Browser
 ```
@@ -221,31 +193,31 @@ No ServiceNow instance connection is required.
 
 ## Local Setup
 
-Clone the repository:
+Clone the repository.
 
 ```bash
 git clone https://github.com/haquenam/csdm-service-model-visualizer.git
 ```
 
-Go into the project folder:
+Go into the project folder.
 
 ```bash
 cd csdm-service-model-visualizer
 ```
 
-Install dependencies:
+Install dependencies.
 
 ```bash
 npm install
 ```
 
-Build the application:
+Build the application.
 
 ```bash
 npm run build
 ```
 
-Preview locally:
+Preview locally.
 
 ```bash
 npm run preview
@@ -255,13 +227,13 @@ npm run preview
 
 The app is deployed using GitHub Actions.
 
-The repository includes a workflow file under:
+The repository includes a workflow file under the following path.
 
 ```text
 .github/workflows/deploy-pages.yml
 ```
 
-The deployment process:
+The deployment process is as follows.
 
 | Step | Description                                                      |
 | ---- | ---------------------------------------------------------------- |
@@ -271,7 +243,7 @@ The deployment process:
 | 4    | GitHub Pages publishes the site                                  |
 | 5    | The application becomes available at the public GitHub Pages URL |
 
-Live application:
+Live application
 
 ```text
 https://haquenam.github.io/csdm-service-model-visualizer/
@@ -279,7 +251,7 @@ https://haquenam.github.io/csdm-service-model-visualizer/
 
 ## Public Use Guidance
 
-Use this tool for:
+Use this tool for the following scenarios.
 
 | Suitable Use            | Description                                                               |
 | ----------------------- | ------------------------------------------------------------------------- |
@@ -289,7 +261,7 @@ Use this tool for:
 | Data quality discussion | Identifying common ownership and relationship gaps                        |
 | Portfolio showcase      | Demonstrating practical ServiceNow and AI assisted development capability |
 
-Do not use this tool for:
+Do not use this tool for the following scenarios.
 
 | Not Recommended                 | Reason                                                        |
 | ------------------------------- | ------------------------------------------------------------- |
@@ -299,26 +271,9 @@ Do not use this tool for:
 | Final CSDM certification        | Formal review by qualified stakeholders is still required     |
 | ServiceNow API integration      | Current version has no ServiceNow instance connection         |
 
-## Roadmap
-
-Potential future enhancements:
-
-| Phase   | Enhancement                                                            |
-| ------- | ---------------------------------------------------------------------- |
-| Phase 1 | Improve validation messaging and gap prioritization                    |
-| Phase 1 | Add severity levels for missing fields and duplicate service instances |
-| Phase 1 | Add CSV template guidance inside the app                               |
-| Phase 2 | Add export to JSON and CSV remediation format                          |
-| Phase 2 | Add diagram export as PNG                                              |
-| Phase 2 | Add filtering by environment and criticality                           |
-| Phase 3 | Add support for multiple CSDM views                                    |
-| Phase 3 | Add ServiceNow import preparation guidance                             |
-| Phase 4 | Add optional AI assisted recommendations                               |
-| Phase 4 | Add a ServiceNow scoped application version                            |
-
 ## Repository Principles
 
-This repository follows these principles:
+This repository follows these principles.
 
 | Principle        | Meaning                                                       |
 | ---------------- | ------------------------------------------------------------- |
@@ -340,11 +295,47 @@ This repository follows these principles:
 | No formal data certification | Results are advisory only                                       |
 | Diagram scalability          | Very large CSV files may make the diagram difficult to read     |
 
+## Roadmap
+
+Potential future enhancements are listed below.
+
+| Phase   | Enhancement                                                            |
+| ------- | ---------------------------------------------------------------------- |
+| Phase 1 | Improve validation messaging and gap prioritization                    |
+| Phase 1 | Add severity levels for missing fields and duplicate service instances |
+| Phase 1 | Add CSV template guidance inside the app                               |
+| Phase 2 | Add export to JSON and CSV remediation format                          |
+| Phase 2 | Add diagram export as PNG                                              |
+| Phase 2 | Add filtering by environment and criticality                           |
+| Phase 3 | Add support for multiple CSDM views                                    |
+| Phase 3 | Add ServiceNow import preparation guidance                             |
+| Phase 4 | Add optional AI assisted recommendations                               |
+| Phase 4 | Add a ServiceNow scoped application version                            |
+
+## Suggested Screenshot Folder
+
+Store README images in the following folder.
+
+```text
+docs/screenshots/
+```
+
+Recommended filenames are listed below.
+
+```text
+01-home-workflow.png
+02-upload-workspace.png
+03-analysis-summary.png
+04-relationship-diagram.png
+05-parsed-records.png
+06-footer-branding.png
+```
+
 ## Author
 
 Built by Enamul Haque.
 
-LinkedIn:
+LinkedIn
 
 https://www.linkedin.com/in/haquenam/
 
@@ -356,4 +347,4 @@ https://github.com/haquenam
 
 This project is intended for public learning and demonstration use.
 
-Add or update the repository license according to the intended reuse model.
+Review the repository license file before reusing, distributing, or modifying the project.
