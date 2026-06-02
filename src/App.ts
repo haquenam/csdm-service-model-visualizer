@@ -245,6 +245,9 @@ const App = () => {
   const summary = useMemo(() => calculateSummary(records), [records]);
   const diagram = useMemo(() => createDiagram(records), [records]);
 
+  const uploadButtonClass = 'inline-flex cursor-pointer items-center justify-center rounded-lg border border-navy bg-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500';
+  const uploadButtonStyle = { backgroundColor: '#0f2544', color: '#ffffff' };
+
   const handleUpload = (event: Event) => {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -260,7 +263,7 @@ const App = () => {
             h('h1', { className: 'text-4xl font-semibold tracking-tight text-navy md:text-6xl', key: 'title' }, 'CSDM Service Model Visualizer'),
             h('p', { className: 'mt-5 max-w-3xl text-lg leading-8 text-slate-600', key: 'desc' }, 'Upload a CSV and review how Business Applications connect through Service Instances, Technical Management Services and Technical Service Offerings. Designed for ServiceNow architects, enterprise architects and platform governance conversations.'),
             h('div', { className: 'mt-7 flex flex-wrap gap-3', key: 'actions' }, [
-              h('label', { className: 'cursor-pointer rounded-lg bg-navy px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800', key: 'upload' }, ['Upload CSV', h('input', { type: 'file', accept: '.csv,text/csv', className: 'hidden', onChange: handleUpload, key: 'input' })]),
+              h('label', { className: uploadButtonClass, htmlFor: 'hero-csv-upload', key: 'upload', style: uploadButtonStyle }, ['Upload CSV', h('input', { id: 'hero-csv-upload', type: 'file', accept: '.csv,text/csv', className: 'sr-only', 'aria-label': 'Upload CSV file', onChange: handleUpload, key: 'input' })]),
               h('button', { className: 'rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50', onClick: () => downloadText('csdm-sample.csv', recordsToCsv(SAMPLE_RECORDS), 'text/csv'), key: 'sample' }, 'Download sample CSV'),
             ]),
           ]),
@@ -281,7 +284,7 @@ const App = () => {
             h('h2', { className: 'mt-1 text-2xl font-semibold text-navy', key: 'title' }, 'Load a CSDM service model CSV'),
             h('p', { className: 'mt-2 max-w-3xl text-sm text-slate-600', key: 'desc' }, 'Choose a CSV file with the required CSDM columns. Parsing and validation run locally in your browser only.'),
           ]),
-          h('label', { className: 'inline-flex cursor-pointer items-center justify-center rounded-lg bg-navy px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800', key: 'upload' }, ['Select CSV file', h('input', { type: 'file', accept: '.csv,text/csv', className: 'hidden', onChange: handleUpload, key: 'input' })]),
+          h('label', { className: uploadButtonClass, htmlFor: 'main-csv-upload', key: 'upload', style: uploadButtonStyle }, ['Upload CSV', h('input', { id: 'main-csv-upload', type: 'file', accept: '.csv,text/csv', className: 'sr-only', 'aria-label': 'Upload CSV file', onChange: handleUpload, key: 'input' })]),
         ]),
       ]),
       h('div', { className: 'grid gap-4 sm:grid-cols-2 lg:grid-cols-4', key: 'stats' }, [
