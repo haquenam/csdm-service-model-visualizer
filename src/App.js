@@ -92,7 +92,7 @@ const downloadText = (filename, text, mimeType) => {
     anchor.click();
     URL.revokeObjectURL(url);
 };
-const parseCsvFile = (file, setRecords, setError) => {
+const parseCsvFile = (file, setRecords, setError, onSuccess) => {
     Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
@@ -110,6 +110,7 @@ const parseCsvFile = (file, setRecords, setError) => {
             }, {}));
             setRecords(parsedRecords);
             setError('');
+            onSuccess?.();
         },
         error: (error) => setError(error.message),
     });
@@ -200,18 +201,41 @@ const StatCard = ({ label, value, tone }) => h('div', { className: 'rounded-xl b
     h('p', { className: `mt-2 text-3xl font-semibold ${tone ?? 'text-navy'}`, key: 'value' }, value),
 ]);
 const App = () => {
-    const [records, setRecords] = useState(SAMPLE_RECORDS);
+    const [records, setRecords] = useState([]);
     const [error, setError] = useState('');
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [hasAnalysisRun, setHasAnalysisRun] = useState(false);
+    const [uploadInputKey, setUploadInputKey] = useState(0);
     const summary = useMemo(() => calculateSummary(records), [records]);
     const diagram = useMemo(() => createDiagram(records), [records]);
     const uploadButtonClass = 'inline-flex cursor-pointer items-center justify-center rounded-lg border border-navy bg-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500';
     const uploadButtonStyle = { backgroundColor: '#0f2544', color: '#ffffff' };
-
+    const secondaryButtonClass = 'inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50';
+    const workflowStepClass = 'rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm';
     const handleUpload = (event) => {
         const input = event.target;
-        const file = input.files?.[0];
-        if (file)
-            parseCsvFile(file, setRecords, setError);
+        const file = input.files?.[0] ?? null;
+        setSelectedFile(file);
+        setRecords([]);
+        setHasAnalysisRun(false);
+        setError('');
+    };
+    const handleRunAnalysis = () => {
+        if (!selectedFile) {
+            setError('Select a CSV file before running analysis.');
+            return;
+        }
+        parseCsvFile(selectedFile, setRecords, (message) => {
+            setError(message);
+            setHasAnalysisRun(false);
+        }, () => setHasAnalysisRun(true));
+    };
+    const handleClearUploadedData = () => {
+        setSelectedFile(null);
+        setRecords([]);
+        setError('');
+        setHasAnalysisRun(false);
+        setUploadInputKey((current) => current + 1);
     };
     return h('main', { className: 'min-h-screen bg-gradient-to-b from-slate-50 to-white' }, [
         h('section', { className: 'border-b border-slate-200 bg-white', key: 'hero' }, h('div', { className: 'mx-auto max-w-7xl px-6 py-10 lg:px-8' }, [
@@ -219,30 +243,46 @@ const App = () => {
             h('div', { className: 'mt-6 grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center', key: 'grid' }, [
                 h('div', { key: 'copy' }, [
                     h('h1', { className: 'text-4xl font-semibold tracking-tight text-navy md:text-6xl', key: 'title' }, 'CSDM Service Model Visualizer'),
-                    h('p', { className: 'mt-5 max-w-3xl text-lg leading-8 text-slate-600', key: 'desc' }, 'Upload a CSV and review how Business Applications connect through Service Instances, Technical Management Services and Technical Service Offerings. Designed for ServiceNow architects, enterprise architects and platform governance conversations.'),
-                    h('div', { className: 'mt-7 flex flex-wrap gap-3', key: 'actions' }, [
-                        h('label', { className: uploadButtonClass, htmlFor: 'hero-csv-upload', key: 'upload', style: uploadButtonStyle }, ['Upload CSV', h('input', { id: 'hero-csv-upload', type: 'file', accept: '.csv,text/csv', className: 'sr-only', 'aria-label': 'Upload CSV file', onChange: handleUpload, key: 'input' })]),
-                        h('button', { className: 'rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50', onClick: () => downloadText('csdm-sample.csv', recordsToCsv(SAMPLE_RECORDS), 'text/csv'), key: 'sample' }, 'Download sample CSV'),
+                    h('p', { className: 'mt-5 max-w-3xl text-lg leading-8 text-slate-600', key: 'desc' }, 'Review how Business Applications connect through Service Instances, Technical Management Services and Technical Service Offerings. The CSV workflow is staged so architects can select a file, confirm it, then run analysis intentionally.'),
+                    h('div', { className: 'mt-7 grid gap-3 sm:grid-cols-4', key: 'steps' }, [
+                        h('div', { className: workflowStepClass, key: 'upload-step' }, '1. Upload CSV'),
+                        h('div', { className: workflowStepClass, key: 'selected-step' }, '2. Selected file'),
+                        h('div', { className: workflowStepClass, key: 'run-step' }, '3. Run Analysis'),
+                        h('div', { className: workflowStepClass, key: 'review-step' }, '4. Review Results'),
                     ]),
                 ]),
                 h('div', { className: 'rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-sm', key: 'panel' }, [
                     h('p', { className: 'text-sm font-semibold uppercase tracking-wide text-steel', key: 'summarylabel' }, 'Executive Summary'),
                     h('p', { className: 'mt-4 text-5xl font-semibold text-navy', key: 'score' }, `${summary.readinessScore}%`),
-                    h('p', { className: 'mt-2 text-sm text-slate-600', key: 'scorecopy' }, 'CSDM readiness score based on required data completeness, owner and support coverage, service instance integrity and offering alignment.'),
-                    h('div', { className: 'mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-900', key: 'disclaimer' }, 'This tool is for educational and architecture review purposes only. Do not upload confidential, customer, production, personal, regulated or sensitive data.'),
+                    h('p', { className: 'mt-2 text-sm text-slate-600', key: 'scorecopy' }, hasAnalysisRun ? 'CSDM readiness score based on required data completeness, owner and support coverage, service instance integrity and offering alignment.' : 'Select a CSV in the upload workspace and click Run Analysis to calculate the CSDM readiness score.'),
+                    h('div', { className: 'mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-medium text-blue-900', key: 'status' }, hasAnalysisRun ? 'Analysis complete. Review the validation summary, relationship diagram, parsed records and export options below.' : 'Waiting for analysis. No uploaded CSV has been parsed yet.'),
                 ]),
             ]),
         ])),
         h('section', { className: 'mx-auto max-w-7xl px-6 py-8 lg:px-8', key: 'content' }, [
             error ? h('div', { className: 'mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800', key: 'error' }, error) : null,
-            h('div', { className: 'mb-6 rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/60 p-6', key: 'uploadarea' }, [
-                h('div', { className: 'flex flex-col gap-4 md:flex-row md:items-center md:justify-between', key: 'wrap' }, [
+            h('div', { className: 'mb-6 rounded-2xl border border-blue-200 bg-white p-6 shadow-sm ring-1 ring-blue-100', key: 'uploadarea' }, [
+                h('div', { className: 'grid gap-6 lg:grid-cols-[1fr_360px]', key: 'workspace' }, [
                     h('div', { key: 'text' }, [
                         h('p', { className: 'text-sm font-semibold uppercase tracking-wide text-blue-800', key: 'label' }, 'CSV upload area'),
-                        h('h2', { className: 'mt-1 text-2xl font-semibold text-navy', key: 'title' }, 'Load a CSDM service model CSV'),
-                        h('p', { className: 'mt-2 max-w-3xl text-sm text-slate-600', key: 'desc' }, 'Choose a CSV file with the required CSDM columns. Parsing and validation run locally in your browser only.'),
+                        h('h2', { className: 'mt-1 text-2xl font-semibold text-navy', key: 'title' }, 'Controlled review workspace'),
+                        h('p', { className: 'mt-2 max-w-3xl text-sm text-slate-600', key: 'desc' }, 'Choose a CSV file with the required CSDM columns. The app will show the selected file name first and will not parse or analyse it until you click Run Analysis.'),
+                        h('div', { className: 'mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium leading-6 text-amber-950', key: 'privacy' }, 'Files are processed locally in your browser. This tool does not intentionally upload your CSV to GitHub, store it in this repository, or send it to a backend server. Do not use confidential, customer, production, personal, regulated or sensitive data.'),
+                        h('div', { className: 'mt-5 flex flex-wrap gap-3', key: 'sample-actions' }, [
+                            h('button', { className: secondaryButtonClass, onClick: () => downloadText('csdm-sample.csv', recordsToCsv(SAMPLE_RECORDS), 'text/csv'), key: 'sample' }, 'Download sample CSV template'),
+                            hasAnalysisRun ? h('button', { className: secondaryButtonClass, onClick: handleClearUploadedData, key: 'clear' }, 'Clear uploaded data') : null,
+                        ]),
                     ]),
-                    h('label', { className: uploadButtonClass, htmlFor: 'main-csv-upload', key: 'upload', style: uploadButtonStyle }, ['Upload CSV', h('input', { id: 'main-csv-upload', type: 'file', accept: '.csv,text/csv', className: 'sr-only', 'aria-label': 'Upload CSV file', onChange: handleUpload, key: 'input' })]),
+                    h('div', { className: 'rounded-2xl border border-slate-200 bg-slate-50 p-4', key: 'controls' }, [
+                        h('div', { className: 'flex flex-col gap-3', key: 'control-stack' }, [
+                            h('label', { className: uploadButtonClass, htmlFor: 'main-csv-upload', key: 'upload', style: uploadButtonStyle }, ['Upload CSV', h('input', { id: 'main-csv-upload', key: uploadInputKey, type: 'file', accept: '.csv,text/csv', className: 'sr-only', 'aria-label': 'Upload CSV file', onChange: handleUpload })]),
+                            h('div', { className: 'rounded-xl border border-slate-200 bg-white p-4', key: 'selected' }, [
+                                h('p', { className: 'text-xs font-semibold uppercase tracking-wide text-slate-500', key: 'label' }, 'Selected file'),
+                                h('p', { className: `mt-2 break-words text-sm font-semibold ${selectedFile ? 'text-navy' : 'text-slate-500'}`, key: 'name' }, selectedFile ? selectedFile.name : 'No CSV selected'),
+                            ]),
+                            h('button', { className: 'inline-flex items-center justify-center rounded-lg border border-navy bg-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50', disabled: !selectedFile, onClick: handleRunAnalysis, key: 'run', style: uploadButtonStyle }, 'Run Analysis'),
+                        ]),
+                    ]),
                 ]),
             ]),
             h('div', { className: 'grid gap-4 sm:grid-cols-2 lg:grid-cols-4', key: 'stats' }, [
@@ -258,8 +298,8 @@ const App = () => {
                 h('div', { className: 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm', key: 'exports' }, [
                     h('p', { className: 'text-sm text-slate-500', key: 'label' }, 'Export reports'),
                     h('div', { className: 'mt-3 flex gap-2', key: 'buttons' }, [
-                        h('button', { className: 'rounded-md bg-steel px-3 py-2 text-xs font-semibold text-white', onClick: () => downloadText('csdm-report.json', JSON.stringify({ summary, records }, null, 2), 'application/json'), key: 'json' }, 'JSON'),
-                        h('button', { className: 'rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700', onClick: () => downloadText('csdm-report.md', generateMarkdownReport(records, summary), 'text/markdown'), key: 'md' }, 'Markdown'),
+                        h('button', { className: 'rounded-md bg-steel px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50', disabled: records.length === 0, onClick: () => downloadText('csdm-report.json', JSON.stringify({ summary, records }, null, 2), 'application/json'), key: 'json' }, 'JSON'),
+                        h('button', { className: 'rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50', disabled: records.length === 0, onClick: () => downloadText('csdm-report.md', generateMarkdownReport(records, summary), 'text/markdown'), key: 'md' }, 'Markdown'),
                     ]),
                 ]),
             ]),
@@ -275,9 +315,9 @@ const App = () => {
             h('div', { className: 'mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm', key: 'tablewrap' }, [
                 h('div', { className: 'border-b border-slate-200 px-4 py-4', key: 'tablehead' }, [
                     h('h2', { className: 'text-xl font-semibold text-navy', key: 'title' }, 'Parsed CSV records'),
-                    h('p', { className: 'text-sm text-slate-500', key: 'desc' }, 'Validated browser-side only. No backend, database or authentication is used.'),
+                    h('p', { className: 'text-sm text-slate-500', key: 'desc' }, hasAnalysisRun ? 'Validated browser-side only. No backend, database or authentication is used.' : 'Run analysis after selecting a CSV to populate parsed records.'),
                 ]),
-                h('div', { className: 'overflow-x-auto', key: 'scroll' }, h('table', { className: 'min-w-full divide-y divide-slate-200 text-sm' }, [
+                h('div', { className: 'overflow-x-auto', key: 'scroll' }, records.length === 0 ? h('div', { className: 'px-4 py-8 text-sm font-medium text-slate-500', key: 'empty' }, 'No parsed CSV records yet.') : h('table', { className: 'min-w-full divide-y divide-slate-200 text-sm', key: 'table' }, [
                     h('thead', { className: 'bg-slate-50', key: 'head' }, h('tr', {}, REQUIRED_COLUMNS.map((column) => h('th', { className: 'whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700', key: column }, column.replace(/_/g, ' '))))),
                     h('tbody', { className: 'divide-y divide-slate-100 bg-white', key: 'body' }, records.map((record, index) => h('tr', { key: index, className: rowIsValid(record) ? '' : 'bg-amber-50' }, REQUIRED_COLUMNS.map((column) => h('td', { className: 'whitespace-nowrap px-4 py-3 text-slate-700', key: column }, record[column] || h('span', { className: 'font-semibold text-amber-700' }, 'Missing'))))))
                 ])),
