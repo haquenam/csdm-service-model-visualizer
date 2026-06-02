@@ -1,152 +1,359 @@
 # CSDM Service Model Visualizer
 
-A public, browser-based static web application for visualizing a simple ServiceNow Common Service Data Model (CSDM) service model from CSV data. The tool is intended for education, architecture review, governance workshops and lightweight data quality assessment.
+A public browser based CSDM service model visualization and validation tool for ServiceNow architects, enterprise architects, platform owners, and governance teams.
 
-> **Disclaimer:** This tool is for educational and architecture review purposes only. Do not upload confidential, customer, production, personal, regulated or sensitive data.
+The application helps users upload a CSDM aligned CSV file, confirm the selected file, run analysis intentionally, review readiness gaps, and visualize the relationship chain from Business Application to Service Instance to Technical Management Service to Technical Service Offering.
 
-## Overview
+Live application
 
-CSDM Service Model Visualizer helps ServiceNow architects and enterprise architects quickly inspect whether application-to-service relationships are complete enough for architecture review discussions. It runs fully in the browser and does not require a backend, database, authentication layer or server-side processing.
+https://haquenam.github.io/csdm-service-model-visualizer/
 
-The first working version includes:
+Built by Enamul Haque
 
-- A professional enterprise architecture landing page.
-- Browser-side CSV upload and parsing with PapaParse.
-- Required CSDM column validation.
-- A validation summary with readiness metrics.
-- A parsed-records table.
-- A React Flow relationship diagram showing:
-  - Business Application → Service Instance → Technical Management Service → Technical Service Offering
-- An executive summary panel with a CSDM readiness score.
-- JSON and Markdown report exports.
-- A sample CSV download button.
-- GitHub Pages deployment workflow.
+LinkedIn
 
-## Features
+https://www.linkedin.com/in/haquenam/
 
-### CSV Upload and Parsing
+## Purpose
 
-Upload CSV files directly in the browser. The application validates the header row before generating records, metrics and diagrams.
+Many ServiceNow CSDM and CMDB initiatives begin with service mapping data in spreadsheets. Before that data is imported, governed, or operationalized, architects need a simple way to inspect whether the model is complete enough for review.
 
-### Required Columns
+This tool provides a lightweight, public, browser based review workspace that allows users to:
 
-The uploaded CSV must include these exact column names:
+| Capability                 | Description                                                                            |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| Upload a CSV               | Select a structured CSDM service model CSV file                                        |
+| Confirm file selection     | Review the selected file before running analysis                                       |
+| Run analysis intentionally | Parse and validate the file only after the user clicks Run Analysis                    |
+| Review readiness           | See a CSDM readiness score and validation summary                                      |
+| Identify gaps              | Highlight missing owners, support groups, service instances, offerings, and duplicates |
+| Visualize relationships    | Generate a CSDM relationship diagram                                                   |
+| Review parsed data         | Inspect uploaded CSV records in a table                                                |
+| Export findings            | Download a Markdown report for review or documentation                                 |
 
-```csv
-business_application,service_instance,technical_management_service,technical_service_offering,application_owner,support_group,environment,criticality
-```
+## Current User Journey
 
-### Validation Summary
+The application follows a controlled review workflow:
 
-The app reports:
+| Step | Action                |
+| ---- | --------------------- |
+| 1    | Upload CSV            |
+| 2    | Confirm selected file |
+| 3    | Run Analysis          |
+| 4    | Review results        |
 
-- Total records
-- Valid records
-- Records missing owner
-- Records missing support group
-- Records missing service instance
-- Records missing technical service offering
-- Duplicate service instances
+This staged flow is intentional. It prevents the application from immediately parsing the file as soon as it is selected and gives users a more controlled architecture review experience.
 
-### CSDM Readiness Score
+## Data Privacy And Safety
 
-The readiness score is a lightweight architecture review indicator based on data completeness, service instance integrity, owner coverage, support group coverage and technical service offering alignment.
+Files are processed locally in the user’s browser.
 
-### Diagram
+This tool does not intentionally upload CSV files to GitHub, store them in this repository, or send them to a backend server.
 
-The model diagram uses React Flow to render a simple CSDM chain:
+Users should not upload confidential, customer, production, personal, regulated, or sensitive data.
+
+The public version should be used with sample, synthetic, anonymized, or non sensitive data only.
+
+## Important Disclaimer
+
+This tool is for educational and architecture review purposes only.
+
+It is not an official ServiceNow product. It is not a replacement for formal CSDM design, CMDB governance, data protection review, ServiceNow import validation, security review, or production implementation assurance.
+
+All outputs should be reviewed by qualified ServiceNow architects, enterprise architects, platform owners, or governance stakeholders before use in any formal delivery context.
+
+## CSDM Relationship Model
+
+The current version visualizes a simplified CSDM relationship chain:
 
 ```text
-Business Application → Service Instance → Technical Management Service → Technical Service Offering
+Business Application
+        ↓
+Service Instance
+        ↓
+Technical Management Service
+        ↓
+Technical Service Offering
 ```
 
-### Exports
+This model is intended to help users understand how application and service data can be structured before it is reviewed, governed, or prepared for ServiceNow alignment.
 
-Export the current analysis as:
+## Required CSV Columns
 
-- JSON report
-- Markdown report
+The CSV file must contain these exact column names:
 
-## Sample CSV Structure
+| Column Name                  | Description                                                               |
+| ---------------------------- | ------------------------------------------------------------------------- |
+| business_application         | The business application used or consumed by the organization             |
+| service_instance             | The deployed or operational service instance                              |
+| technical_management_service | The technical service responsible for managing or supporting the instance |
+| technical_service_offering   | The specific technical service offering or support level                  |
+| application_owner            | The named owner of the business application                               |
+| support_group                | The group responsible for operational support                             |
+| environment                  | The environment, such as Production, UAT, Test, or Development            |
+| criticality                  | The business or operational criticality rating                            |
+
+## Example CSV Structure
 
 ```csv
 business_application,service_instance,technical_management_service,technical_service_offering,application_owner,support_group,environment,criticality
-Customer Portal,Customer Portal - Production,Web Application Management,Managed Web Application - Gold,Avery Chen,Digital Experience Support,Production,High
-Order Management,Order Management - Production,Commerce Platform Management,Commerce Platform - Platinum,Morgan Patel,Commerce Operations,Production,Critical
-Employee Knowledge Base,Employee KB - UAT,Knowledge Platform Management,Knowledge Platform - Standard,Jordan Smith,IT Collaboration Services,UAT,Medium
+Salesforce,Salesforce Production,CRM Platform Support,Gold Application Support,Jane Smith,CRM Support Team,Production,High
+Workday,Workday UK Production,HR Platform Support,Standard Application Support,John Brown,HR Systems Team,Production,High
+ServiceNow,ServiceNow Production,ServiceNow Platform Support,Enterprise Platform Support,Alex Green,ServiceNow Platform Team,Production,High
 ```
 
-The application also includes a **Download sample CSV** button on the landing page.
+## Validation Rules
 
-## Technology
+The application currently checks for:
 
-This project is structured as a Vite-style React and TypeScript static web application and is configured with a GitHub Pages base path of `/csdm-service-model-visualizer/`.
+| Validation Check                   | Description                                    |
+| ---------------------------------- | ---------------------------------------------- |
+| Total records                      | Total number of parsed CSV rows                |
+| Valid records                      | Rows where all required fields are populated   |
+| Missing owners                     | Records missing application owner              |
+| Missing support group              | Records missing support group                  |
+| Missing service instance           | Records missing service instance               |
+| Missing technical service offering | Records missing technical service offering     |
+| Duplicate service instances        | Repeated service instance names across records |
 
-Runtime libraries used by the public static app:
+## Readiness Score
 
-- React
-- TypeScript
-- Vite configuration
-- Tailwind CSS
-- PapaParse
-- React Flow
+The CSDM readiness score is a lightweight indicator based on required data completeness, owner coverage, support group coverage, service instance integrity, and offering alignment.
 
-The application is intentionally static: all parsing, validation, diagramming and exports happen client-side in the user's browser.
+The score is intended as a quick review signal, not a formal maturity assessment.
 
-## Setup
+| Score Range | Interpretation                              |
+| ----------- | ------------------------------------------- |
+| 90 to 100   | Strong initial readiness                    |
+| 70 to 89    | Usable but requires review and remediation  |
+| 50 to 69    | Material data quality gaps exist            |
+| Below 50    | Not ready for reliable service model review |
 
-From the repository root:
+## Screenshots
+
+Add screenshots to the repository under:
+
+```text
+docs/screenshots/
+```
+
+Suggested screenshot filenames:
+
+```text
+docs/screenshots/01-home-workflow.png
+docs/screenshots/02-upload-workspace.png
+docs/screenshots/03-analysis-summary.png
+docs/screenshots/04-relationship-diagram.png
+docs/screenshots/05-parsed-records.png
+```
+
+Then reference them here:
+
+### Home And Workflow
+
+```markdown
+![Home and workflow](docs/screenshots/01-home-workflow.png)
+```
+
+### Controlled Upload Workspace
+
+```markdown
+![Controlled upload workspace](docs/screenshots/02-upload-workspace.png)
+```
+
+### Analysis Summary
+
+```markdown
+![Analysis summary](docs/screenshots/03-analysis-summary.png)
+```
+
+### CSDM Relationship Diagram
+
+```markdown
+![CSDM relationship diagram](docs/screenshots/04-relationship-diagram.png)
+```
+
+### Parsed CSV Records
+
+```markdown
+![Parsed CSV records](docs/screenshots/05-parsed-records.png)
+```
+
+## Technology Stack
+
+| Layer             | Technology                 |
+| ----------------- | -------------------------- |
+| Application type  | Static browser application |
+| Language          | TypeScript and JavaScript  |
+| UI runtime        | React                      |
+| CSV parsing       | PapaParse                  |
+| Diagram rendering | React Flow                 |
+| Styling           | Tailwind CSS               |
+| Hosting           | GitHub Pages               |
+| CI and deployment | GitHub Actions             |
+
+## Architecture
+
+The application is intentionally simple.
+
+```text
+User Browser
+    |
+    | Select CSV file
+    ↓
+Browser Local Processing
+    |
+    | Parse CSV
+    | Validate required fields
+    | Calculate readiness score
+    | Generate diagram
+    ↓
+Results Displayed In Browser
+```
+
+No backend server is required.
+
+No database is required.
+
+No authentication is required.
+
+No ServiceNow instance connection is required.
+
+## Local Setup
+
+Clone the repository:
+
+```bash
+git clone https://github.com/haquenam/csdm-service-model-visualizer.git
+```
+
+Go into the project folder:
+
+```bash
+cd csdm-service-model-visualizer
+```
+
+Install dependencies:
 
 ```bash
 npm install
+```
+
+Build the application:
+
+```bash
 npm run build
 ```
 
-The build output is written to `dist/`.
-
-For a local static preview after building:
+Preview locally:
 
 ```bash
 npm run preview
 ```
 
-## Deployment to GitHub Pages
+## GitHub Pages Deployment
 
-The repository includes `.github/workflows/deploy-pages.yml`, which:
+The app is deployed using GitHub Actions.
 
-1. Checks out the repository.
-2. Sets up Node.js.
-3. Runs `npm install`.
-4. Runs `npm run build`.
-5. Uploads `dist/` as the GitHub Pages artifact.
-6. Deploys the artifact to GitHub Pages.
+The repository includes a workflow file under:
 
-The Vite configuration uses:
-
-```ts
-base: '/csdm-service-model-visualizer/'
+```text
+.github/workflows/deploy-pages.yml
 ```
 
-To deploy:
+The deployment process:
 
-1. Enable GitHub Pages for the repository.
-2. Set the Pages source to **GitHub Actions**.
-3. Push to the `main` branch or run the workflow manually.
-4. Open the published GitHub Pages URL when deployment completes.
+| Step | Description                                                      |
+| ---- | ---------------------------------------------------------------- |
+| 1    | Code is merged into the main branch                              |
+| 2    | GitHub Actions runs the build                                    |
+| 3    | Static files are generated                                       |
+| 4    | GitHub Pages publishes the site                                  |
+| 5    | The application becomes available at the public GitHub Pages URL |
+
+Live application:
+
+```text
+https://haquenam.github.io/csdm-service-model-visualizer/
+```
+
+## Public Use Guidance
+
+Use this tool for:
+
+| Suitable Use            | Description                                                               |
+| ----------------------- | ------------------------------------------------------------------------- |
+| Learning                | Understanding a simplified CSDM relationship model                        |
+| Demonstration           | Showing how CSV based service data can be visualized                      |
+| Architecture review     | Reviewing model completeness before deeper design                         |
+| Data quality discussion | Identifying common ownership and relationship gaps                        |
+| Portfolio showcase      | Demonstrating practical ServiceNow and AI assisted development capability |
+
+Do not use this tool for:
+
+| Not Recommended                 | Reason                                                        |
+| ------------------------------- | ------------------------------------------------------------- |
+| Real customer data              | Public browser based tools should avoid sensitive information |
+| Production CMDB import approval | This tool is not a formal import validator                    |
+| Regulatory evidence             | It is not designed as an audit control                        |
+| Final CSDM certification        | Formal review by qualified stakeholders is still required     |
+| ServiceNow API integration      | Current version has no ServiceNow instance connection         |
 
 ## Roadmap
 
 Potential future enhancements:
 
-- Add richer CSDM entity types such as Application Service, Business Service and Business Service Offering.
-- Add configurable validation rules and severity levels.
-- Add CSV template variants for different CSDM maturity levels.
-- Add filtering by owner, support group, criticality and environment.
-- Add diagram clustering by application portfolio or business capability.
-- Add offline bundled assets for environments that restrict CDN access.
-- Add visual warnings for orphaned or incomplete relationship paths.
-- Add optional anonymization helpers before analysis.
+| Phase   | Enhancement                                                            |
+| ------- | ---------------------------------------------------------------------- |
+| Phase 1 | Improve validation messaging and gap prioritization                    |
+| Phase 1 | Add severity levels for missing fields and duplicate service instances |
+| Phase 1 | Add CSV template guidance inside the app                               |
+| Phase 2 | Add export to JSON and CSV remediation format                          |
+| Phase 2 | Add diagram export as PNG                                              |
+| Phase 2 | Add filtering by environment and criticality                           |
+| Phase 3 | Add support for multiple CSDM views                                    |
+| Phase 3 | Add ServiceNow import preparation guidance                             |
+| Phase 4 | Add optional AI assisted recommendations                               |
+| Phase 4 | Add a ServiceNow scoped application version                            |
 
-## Disclaimer
+## Repository Principles
 
-This tool is for educational and architecture review purposes only. Do not upload confidential, customer, production, personal, regulated or sensitive data.
+This repository follows these principles:
+
+| Principle        | Meaning                                                       |
+| ---------------- | ------------------------------------------------------------- |
+| Public safe      | No customer or confidential data is stored in the repository  |
+| Browser first    | The tool runs fully in the browser                            |
+| Simple by design | No backend or database dependency                             |
+| Architecture led | The tool focuses on CSDM relationship clarity                 |
+| Governance aware | The workflow includes explicit data safety warnings           |
+| Reusable         | The app can be used for demos, learning, and portfolio review |
+
+## Known Limitations
+
+| Limitation                   | Explanation                                                     |
+| ---------------------------- | --------------------------------------------------------------- |
+| Simplified CSDM model        | The current version focuses on a four object relationship chain |
+| No ServiceNow API            | The app does not connect to a ServiceNow instance               |
+| No persistent storage        | Data is not saved after the browser session unless exported     |
+| No authentication            | The public version is open access                               |
+| No formal data certification | Results are advisory only                                       |
+| Diagram scalability          | Very large CSV files may make the diagram difficult to read     |
+
+## Author
+
+Built by Enamul Haque.
+
+LinkedIn:
+
+https://www.linkedin.com/in/haquenam/
+
+GitHub
+
+https://github.com/haquenam
+
+## License
+
+This project is intended for public learning and demonstration use.
+
+Add or update the repository license according to the intended reuse model.
