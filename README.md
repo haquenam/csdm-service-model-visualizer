@@ -124,6 +124,13 @@ The score is intended as a quick review signal, not a formal maturity assessment
 | 50 to 69    | Material data quality gaps exist            |
 | Below 50    | Not ready for reliable service model review |
 
+
+## Release Notes
+
+### Release 1.1: Validation Messaging And Severity Prioritisation
+
+Release 1.1 improves validation clarity by adding a Priority Issues panel after analysis is complete. Detected validation gaps now include severity prioritisation for missing service instances, duplicate service instances, missing technical service offerings, missing support groups, and missing application owners. Each priority issue also includes a recommended action so reviewers can understand the next governance step before formal service model review.
+
 ## Screenshots
 
 ### Home And Workflow
