@@ -1,4 +1,9 @@
 "use strict";
+const SEVERITY_STYLES = {
+    High: 'border-red-200 bg-red-50 text-red-800 ring-red-100',
+    Medium: 'border-amber-200 bg-amber-50 text-amber-800 ring-amber-100',
+    Low: 'border-blue-200 bg-blue-50 text-blue-800 ring-blue-100',
+};
 const REQUIRED_COLUMNS = [
     'business_application',
     'service_instance',
@@ -74,6 +79,45 @@ const calculateSummary = (records) => {
         readinessScore,
     };
 };
+const getPriorityIssues = (summary) => [
+    {
+        name: 'Missing service instance',
+        severity: 'High',
+        count: summary.missingServiceInstance,
+        action: 'Confirm or create the correct service instance before service model review.',
+    },
+    {
+        name: 'Duplicate service instance',
+        severity: 'High',
+        count: summary.duplicateServiceInstances,
+        action: 'Review naming and ownership to confirm whether records represent the same service instance or separate service instances.',
+    },
+    {
+        name: 'Missing technical service offering',
+        severity: 'Medium',
+        count: summary.missingTechnicalServiceOffering,
+        action: 'Define the technical service offering or support model before downstream governance.',
+    },
+    {
+        name: 'Missing support group',
+        severity: 'Medium',
+        count: summary.missingSupportGroup,
+        action: 'Assign the operational support group responsible for service ownership and support.',
+    },
+    {
+        name: 'Missing application owner',
+        severity: 'Low',
+        count: summary.missingOwner,
+        action: 'Confirm the accountable application owner before formal review.',
+    },
+].filter((issue) => issue.count > 0);
+const priorityIssuesToMarkdown = (issues) => issues.length === 0
+    ? 'No priority validation issues detected.'
+    : [
+        '| Issue | Severity | Count | Recommended action |',
+        '| --- | --- | --- | --- |',
+        ...issues.map((issue) => `| ${issue.name} | ${issue.severity} | ${issue.count} | ${issue.action} |`),
+    ].join('\n');
 const csvEscape = (value) => {
     if (/[",\n]/.test(value))
         return `"${value.replace(/"/g, '""')}"`;
@@ -182,6 +226,10 @@ const generateMarkdownReport = (records, summary) => `# CSDM Service Model Visua
 - Records missing technical service offering: ${summary.missingTechnicalServiceOffering}
 - Duplicate service instances: ${summary.duplicateServiceInstances}
 
+## Priority Issues
+
+${priorityIssuesToMarkdown(getPriorityIssues(summary))}
+
 ## Scope
 
 This browser-generated report maps Business Application to Service Instance to Technical Management Service to Technical Service Offering.
@@ -200,6 +248,32 @@ const StatCard = ({ label, value, tone }) => h('div', { className: 'rounded-xl b
     h('p', { className: 'text-sm text-slate-500', key: 'label' }, label),
     h('p', { className: `mt-2 text-3xl font-semibold ${tone ?? 'text-navy'}`, key: 'value' }, value),
 ]);
+const SeverityBadge = ({ severity }) => h('span', {
+    className: `inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ring-1 ${SEVERITY_STYLES[severity]}`,
+}, severity);
+const PriorityIssuesPanel = ({ issues }) => h('div', { className: 'mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm', key: 'priority-issues' }, [
+    h('div', { className: 'border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6', key: 'head' }, [
+        h('p', { className: 'text-sm font-semibold uppercase tracking-wide text-steel', key: 'eyebrow' }, 'Validation prioritisation'),
+        h('h2', { className: 'mt-1 text-xl font-semibold text-navy', key: 'title' }, 'Priority Issues'),
+        h('p', { className: 'mt-1 text-sm text-slate-600', key: 'desc' }, 'Detected validation gaps are ordered by enterprise review urgency with severity, volume and recommended next action.'),
+    ]),
+    issues.length === 0
+        ? h('div', { className: 'px-4 py-6 text-sm font-medium text-emerald-800 sm:px-6', key: 'empty' }, 'No priority validation issues detected. Continue reviewing the relationship diagram and parsed records for model accuracy.')
+        : h('div', { className: 'overflow-x-auto', key: 'tablewrap' }, h('table', { className: 'min-w-full divide-y divide-slate-200 text-sm', key: 'table' }, [
+            h('thead', { className: 'bg-white', key: 'head' }, h('tr', {}, [
+                h('th', { className: 'whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700 sm:px-6', key: 'issue' }, 'Issue name'),
+                h('th', { className: 'whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700', key: 'severity' }, 'Severity'),
+                h('th', { className: 'whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700', key: 'count' }, 'Count'),
+                h('th', { className: 'min-w-[320px] px-4 py-3 text-left font-semibold text-slate-700 sm:pr-6', key: 'action' }, 'Recommended action'),
+            ])),
+            h('tbody', { className: 'divide-y divide-slate-100 bg-white', key: 'body' }, issues.map((issue) => h('tr', { className: issue.severity === 'High' ? 'bg-red-50/40' : '', key: issue.name }, [
+                h('td', { className: 'whitespace-nowrap px-4 py-4 font-semibold text-navy sm:px-6', key: 'name' }, issue.name),
+                h('td', { className: 'whitespace-nowrap px-4 py-4', key: 'severity' }, h(SeverityBadge, { severity: issue.severity })),
+                h('td', { className: 'whitespace-nowrap px-4 py-4 text-lg font-semibold text-slate-900', key: 'count' }, issue.count),
+                h('td', { className: 'px-4 py-4 leading-6 text-slate-700 sm:pr-6', key: 'action' }, issue.action),
+            ]))),
+        ])),
+]);
 const App = () => {
     const [records, setRecords] = useState([]);
     const [error, setError] = useState('');
@@ -208,6 +282,7 @@ const App = () => {
     const [uploadInputKey, setUploadInputKey] = useState(0);
     const summary = useMemo(() => calculateSummary(records), [records]);
     const diagram = useMemo(() => createDiagram(records), [records]);
+    const priorityIssues = useMemo(() => getPriorityIssues(summary), [summary]);
     const uploadButtonClass = 'inline-flex cursor-pointer items-center justify-center rounded-lg border border-navy bg-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500';
     const uploadButtonStyle = { backgroundColor: '#0f2544', color: '#ffffff' };
     const secondaryButtonClass = 'inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50';
@@ -303,6 +378,7 @@ const App = () => {
                     ]),
                 ]),
             ]),
+            hasAnalysisRun ? h(PriorityIssuesPanel, { issues: priorityIssues, key: 'prioritypanel' }) : null,
             h('div', { className: 'mt-8 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm', key: 'diagramwrap' }, [
                 h('div', { className: 'mb-4 flex items-center justify-between', key: 'heading' }, [
                     h('div', { key: 'copy' }, [
