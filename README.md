@@ -311,6 +311,7 @@ Potential future enhancements are listed below.
 | Phase 3 | Add ServiceNow import preparation guidance                             |
 | Phase 4 | Add optional AI assisted recommendations                               |
 | Phase 4 | Add a ServiceNow scoped application version                            |
+
 ## Author
 
 Built by Enamul Haque.
