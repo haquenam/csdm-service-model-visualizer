@@ -14,6 +14,56 @@ const REQUIRED_COLUMNS = [
     'environment',
     'criticality',
 ];
+const CSV_TEMPLATE_GUIDANCE = [
+    {
+        column: 'business_application',
+        purpose: 'Business application being reviewed or mapped.',
+        example: 'Salesforce',
+        guidance: 'Use the recognised application name used by architecture, portfolio or CMDB teams.',
+    },
+    {
+        column: 'service_instance',
+        purpose: 'Deployed or operational service instance.',
+        example: 'Salesforce Production',
+        guidance: 'Use a clear instance name that separates production, regional or major operational variants.',
+    },
+    {
+        column: 'technical_management_service',
+        purpose: 'Technical service responsible for managing or supporting the instance.',
+        example: 'CRM Platform Support',
+        guidance: 'Use the management or support service that owns the technical operation of the instance.',
+    },
+    {
+        column: 'technical_service_offering',
+        purpose: 'Specific technical service offering or support level.',
+        example: 'Gold Application Support',
+        guidance: 'Use the offering or support model that describes how the service is consumed or supported.',
+    },
+    {
+        column: 'application_owner',
+        purpose: 'Accountable owner for the business application.',
+        example: 'Jane Smith',
+        guidance: 'Use a named accountable owner where possible, not a generic team name.',
+    },
+    {
+        column: 'support_group',
+        purpose: 'Operational support group responsible for support.',
+        example: 'CRM Support Team',
+        guidance: 'Use the group that would own incidents, changes or operational support.',
+    },
+    {
+        column: 'environment',
+        purpose: 'Lifecycle environment for the record.',
+        example: 'Production',
+        guidance: 'Use values such as Production, UAT, Test or Development.',
+    },
+    {
+        column: 'criticality',
+        purpose: 'Business or operational criticality.',
+        example: 'High',
+        guidance: 'Use values such as Critical, High, Medium or Low.',
+    },
+];
 const SAMPLE_RECORDS = [
     {
         business_application: 'Customer Portal',
@@ -251,6 +301,27 @@ const StatCard = ({ label, value, tone }) => h('div', { className: 'rounded-xl b
 const SeverityBadge = ({ severity }) => h('span', {
     className: `inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ring-1 ${SEVERITY_STYLES[severity]}`,
 }, severity);
+const CsvTemplateGuidancePanel = () => h('div', { className: 'mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm', key: 'csv-guidance' }, [
+    h('div', { className: 'border-b border-slate-200 bg-white px-4 py-4 sm:px-5', key: 'intro' }, [
+        h('p', { className: 'text-sm font-semibold uppercase tracking-wide text-steel', key: 'eyebrow' }, 'CSV Template Guidance'),
+        h('h3', { className: 'mt-1 text-lg font-semibold text-navy', key: 'title' }, 'Required column reference'),
+        h('p', { className: 'mt-2 text-sm leading-6 text-slate-600', key: 'note' }, 'Use this guidance before preparing your CSV. The column names must match exactly because the browser side validator checks these headers during analysis.'),
+    ]),
+    h('div', { className: 'overflow-x-auto', key: 'tablewrap' }, h('table', { className: 'min-w-full divide-y divide-slate-200 text-sm', key: 'table' }, [
+        h('thead', { className: 'bg-slate-100', key: 'head' }, h('tr', {}, [
+            h('th', { className: 'whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700 sm:px-5', key: 'column' }, 'Column name'),
+            h('th', { className: 'min-w-[220px] px-4 py-3 text-left font-semibold text-slate-700', key: 'purpose' }, 'Purpose'),
+            h('th', { className: 'whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700', key: 'example' }, 'Example value'),
+            h('th', { className: 'min-w-[300px] px-4 py-3 text-left font-semibold text-slate-700 sm:pr-5', key: 'guidance' }, 'Guidance note'),
+        ])),
+        h('tbody', { className: 'divide-y divide-slate-100 bg-white', key: 'body' }, CSV_TEMPLATE_GUIDANCE.map((item) => h('tr', { key: item.column }, [
+            h('td', { className: 'whitespace-nowrap px-4 py-4 font-mono text-xs font-semibold text-navy sm:px-5', key: 'column' }, item.column),
+            h('td', { className: 'px-4 py-4 leading-6 text-slate-700', key: 'purpose' }, item.purpose),
+            h('td', { className: 'whitespace-nowrap px-4 py-4 font-medium text-slate-900', key: 'example' }, item.example),
+            h('td', { className: 'px-4 py-4 leading-6 text-slate-700 sm:pr-5', key: 'guidance' }, item.guidance),
+        ]))),
+    ])),
+]);
 const PriorityIssuesPanel = ({ issues }) => h('div', { className: 'mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm', key: 'priority-issues' }, [
     h('div', { className: 'border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6', key: 'head' }, [
         h('p', { className: 'text-sm font-semibold uppercase tracking-wide text-steel', key: 'eyebrow' }, 'Validation prioritisation'),
@@ -343,6 +414,7 @@ const App = () => {
                         h('h2', { className: 'mt-1 text-2xl font-semibold text-navy', key: 'title' }, 'Controlled review workspace'),
                         h('p', { className: 'mt-2 max-w-3xl text-sm text-slate-600', key: 'desc' }, 'Choose a CSV file with the required CSDM columns. The app will show the selected file name first and will not parse or analyse it until you click Run Analysis.'),
                         h('div', { className: 'mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium leading-6 text-amber-950', key: 'privacy' }, 'Files are processed locally in your browser. This tool does not intentionally upload your CSV to GitHub, store it in this repository, or send it to a backend server. Do not use confidential, customer, production, personal, regulated or sensitive data.'),
+                        h(CsvTemplateGuidancePanel, { key: 'csv-guidance-panel' }),
                         h('div', { className: 'mt-5 flex flex-wrap gap-3', key: 'sample-actions' }, [
                             h('button', { className: secondaryButtonClass, onClick: () => downloadText('csdm-sample.csv', recordsToCsv(SAMPLE_RECORDS), 'text/csv'), key: 'sample' }, 'Download sample CSV template'),
                             hasAnalysisRun ? h('button', { className: secondaryButtonClass, onClick: handleClearUploadedData, key: 'clear' }, 'Clear uploaded data') : null,

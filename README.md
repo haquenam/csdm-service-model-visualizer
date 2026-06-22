@@ -127,6 +127,12 @@ The score is intended as a quick review signal, not a formal maturity assessment
 
 ## Release Notes
 
+### Release 1.2: CSV Template Guidance Pack
+
+Release 1.2 adds CSV template guidance directly inside the upload workspace to improve onboarding before upload and analysis. Users can now review each required column, understand its purpose, compare example values, and follow enterprise data preparation notes before downloading the sample CSV template or selecting a file.
+
+The guidance covers business application, service instance, technical management service, technical service offering, application owner, support group, environment, and criticality fields with required column descriptions and example values.
+
 ### Release 1.1: Validation Messaging And Severity Prioritisation
 
 Release 1.1 improves validation clarity by adding a Priority Issues panel after analysis is complete. Detected validation gaps now include severity prioritisation for missing service instances, duplicate service instances, missing technical service offerings, missing support groups, and missing application owners. Each priority issue also includes a recommended action so reviewers can understand the next governance step before formal service model review.
