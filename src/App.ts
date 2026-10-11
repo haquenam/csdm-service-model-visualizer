@@ -140,14 +140,14 @@ const App = () => {
     (!search || FIELDS.some((field) => record[field].toLowerCase().includes(search.toLowerCase())))),
   [records, environment, criticality, search]) as CsdmRecord[];
   const graph = useMemo(() => createGraph(filtered, version, view), [filtered, version, view]);
-  const flowNodes = useMemo(() => graph.nodes.map((n) => ({
+  const flowNodes = useMemo(() => graph.nodes.map((n: Graph['nodes'][number]) => ({
     id: n.id, type: 'default', data: { label: LABELS[version][n.kind] + '\n' + n.label, kind: n.kind, fullLabel: n.label },
     position: { x: n.x, y: n.y },
     style: { width: 245, whiteSpace: 'pre-line', borderRadius: 10, fontSize: 12, color: '#0f2544',
       border: '1px solid #94a3b8', background: n.kind === 'service_instance' ? '#e0f2fe' : '#f8fafc',
       padding: 8 },
   })), [graph, version]);
-  const flowEdges = useMemo(() => graph.edges.map((e) => ({
+  const flowEdges = useMemo(() => graph.edges.map((e: Graph['edges'][number]) => ({
     id: e.id, source: e.source, target: e.target, label: e.label,
     labelStyle: { fontSize: 9, fill: '#334155' }, style: { stroke: e.relationType === 'Reference' ? '#94a3b8' : '#2563eb',
       strokeDasharray: e.relationType === 'Reference' ? '5 4' : undefined },
