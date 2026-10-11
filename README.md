@@ -1,5 +1,7 @@
 # CSDM Service Model Visualizer
 
+> **v2.0 development branch (not yet released).** The GitHub Pages site on main remains v1.2. The source in release/v2.0.0 contains an actively tested v2.0 workbench. Do not treat this development branch as production-certified CSDM guidance.
+
 A public browser based CSDM service model visualization and validation tool for ServiceNow architects, enterprise architects, platform owners, and governance teams.
 
 The application helps users upload a CSDM aligned CSV file, confirm the selected file, run analysis intentionally, review readiness gaps, and visualize the relationship chain from Business Application to Service Instance to Technical Management Service to Technical Service Offering.
@@ -59,7 +61,7 @@ All outputs should be reviewed by qualified ServiceNow architects, enterprise ar
 
 ## CSDM Relationship Model
 
-The current version visualizes a simplified CSDM relationship chain.
+The v1 release visualises a simplified relationship chain. The v2 development branch replaces this with explicit reference and CMDB relationship edges.
 
 ```text
 Business Application
@@ -73,7 +75,7 @@ Technical Service Offering
 
 This model is intended to help users understand how application and service data can be structured before it is reviewed, governed, or prepared for ServiceNow alignment.
 
-## Required CSV Columns
+## v1 Required CSV Columns (historical)
 
 The CSV file must contain these exact column names.
 
@@ -97,7 +99,7 @@ Workday,Workday UK Production,HR Platform Support,Standard Application Support,J
 ServiceNow,ServiceNow Production,ServiceNow Platform Support,Enterprise Platform Support,Alex Green,ServiceNow Platform Team,Production,High
 ```
 
-## Validation Rules
+## v1 Validation Rules (historical)
 
 The application currently checks for the following validation indicators.
 
@@ -111,7 +113,7 @@ The application currently checks for the following validation indicators.
 | Missing technical service offering | Records missing technical service offering     |
 | Duplicate service instances        | Repeated service instance names across records |
 
-## Readiness Score
+## v1 Readiness Score (historical)
 
 The CSDM readiness score is a lightweight indicator based on required data completeness, owner coverage, support group coverage, service instance integrity, and offering alignment.
 
@@ -308,22 +310,38 @@ This repository follows these principles.
 | No formal data certification | Results are advisory only                                       |
 | Diagram scalability          | Very large CSV files may make the diagram difficult to read     |
 
+## Release 2.0 Development Scope
+
+Version 2.0 is being prepared as a major release, replacing the v1 CSV-centric interface with a CSDM 4/5-aware validation and remediation workbench.
+
+- Version-aware display names and relationship semantics, including the Business Application relationship change and the distinction between CMDB relationships and parent references.
+- Canonical entity model, stable system identity where supplied, and version-specific CSV templates.
+- Compatibility with the original v1 flat CSV headers and CSDM 4/5 aliases for the mapped fields.
+- Row-level findings: missing core relationships, owner and support gaps, exact duplicate rows, identity and parent conflicts.
+- Four graph perspectives: end-to-end, Application, Service Delivery and Service Consumption.
+- Environment, criticality and free-text filtering, with downloadable PNG graph.
+- Remediation CSV, JSON and Markdown exports, with in-session status tracking.
+- Automated model tests and build checks. A passing build does not replace browser acceptance testing.
+
+**Important boundaries:** The CSV is a simplified relationship extract, not a complete representation of a ServiceNow instance. We do not infer absent relationships or certify CSDM compliance. Source-specific ServiceNow table exports can require a mapping/normalisation step; multi-file joins, table APIs, durable remediation storage and live instance integration are not included. The ServiceNow EA Workspace exception to the BA/Application Service relationship is documented rather than silently altered. The graph explicitly caps rendering to 120 unique nodes; filtering makes larger data sets inspectable, but this is not unrestricted graph scalability.
+
+See [v2 release model and acceptance criteria](docs/V2_RELEASE_PLAN.md).
+
 ## Roadmap
 
-Potential future enhancements are listed below.
+| Completed in v1 | Release |
+| --- | --- |
+| Validation severity and recommended actions | v1.1 |
+| CSV header reference and template guidance | v1.2 |
 
-| Phase   | Enhancement                                                            |
-| ------- | ---------------------------------------------------------------------- |
-| Phase 1 | Improve validation messaging and gap prioritization                    |
-| Phase 1 | Add severity levels for missing fields and duplicate service instances |
-| Phase 1 | Add CSV template guidance inside the app                               |
-| Phase 2 | Add export to JSON and CSV remediation format                          |
-| Phase 2 | Add diagram export as PNG                                              |
-| Phase 2 | Add filtering by environment and criticality                           |
-| Phase 3 | Add support for multiple CSDM views                                    |
-| Phase 3 | Add ServiceNow import preparation guidance                             |
-| Phase 4 | Add optional AI assisted recommendations                               |
-| Phase 4 | Add a ServiceNow scoped application version                            |
+| Later enhancement (after v2 acceptance) | Purpose |
+| --- | --- |
+| Native multi-table ServiceNow import adapters | Join table-specific exports by stable identifiers and relations |
+| Configurable EA Workspace compatibility mode | Handle documented relationship exceptions explicitly |
+| Hierarchical clustering and large-graph navigation | Go beyond the currently capped graph |
+| Persisted collaborative remediation management | Requires appropriate security and data governance |
+| AI assisted recommendations | Only after deterministic validation has been accepted |
+| Native ServiceNow scoped application | Separate platform security and integration effort |
 
 ## Author
 
