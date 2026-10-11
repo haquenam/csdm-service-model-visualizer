@@ -161,3 +161,17 @@ test('consumer-only PNG view does not repeat instances unnecessarily', () => {
   assert.equal(prepared.consumerSectionY, null);
   assert.deepEqual(prepared.graph, graph);
 });
+
+test('remediation export includes a Medium severity finding for a missing support group', () => {
+  const incomplete = { ...standardSample()[0], support_group: '' };
+  const analysis = analyse([incomplete], '5');
+  const finding = analysis.findings.find((item) => item.code === 'missing_support_group');
+  assert.ok(finding, 'missing support group produces a finding');
+  assert.equal(finding.severity, 'Medium');
+  assert.equal(finding.businessApplication, 'Customer Portal');
+  assert.ok(analysis.score < 100);
+  const csv = remediationCsv(analysis.findings);
+  assert.ok(csv.includes('business_application,row,issue_type,severity'));
+  assert.ok(csv.includes('Customer Portal,2,missing_support_group,Medium'));
+  assert.ok(csv.includes('Open'));
+});
