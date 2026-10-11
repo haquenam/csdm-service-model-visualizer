@@ -9,7 +9,7 @@ declare const Papa: any;
 declare const ReactFlow: any;
 const h = React.createElement;
 const { useMemo, useState } = React;
-const { ReactFlow: FlowCanvas, Background, Controls, MiniMap } = ReactFlow;
+const { ReactFlow: FlowCanvas, Background, Controls, MiniMap, Handle, Position, MarkerType } = ReactFlow;
 const chip = 'inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold';
 const button = 'rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40';
 const primary = 'rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40';
@@ -128,6 +128,24 @@ const severityStyle: Record<string, string> = {
   Medium: 'border-amber-200 bg-amber-50 text-amber-800',
   Low: 'border-blue-200 bg-blue-50 text-blue-800',
 };
+// Dedicated directional handles stop React Flow's default top/bottom anchor routing
+// from making short CSDM relationships look like loops around each entity.
+const CsdmNode = ({ data }: { data: { kind: EntityKind; fullLabel: string; heading: string } }) => h('div', {
+  className: 'relative rounded-xl border border-slate-300 bg-white px-4 py-3 text-center shadow-sm',
+  style: { width: 246, minHeight: 70, backgroundColor: data.kind === 'service_instance' ? '#e0f2fe' : '#ffffff' },
+}, [
+  h(Handle, { key: 'target-left', id: 'target-left', type: 'target', position: Position.Left,
+    style: { opacity: 0, width: 8, height: 8 } }),
+  h(Handle, { key: 'target-right', id: 'target-right', type: 'target', position: Position.Right,
+    style: { opacity: 0, width: 8, height: 8 } }),
+  h(Handle, { key: 'source-left', id: 'source-left', type: 'source', position: Position.Left,
+    style: { opacity: 0, width: 8, height: 8 } }),
+  h(Handle, { key: 'source-right', id: 'source-right', type: 'source', position: Position.Right,
+    style: { opacity: 0, width: 8, height: 8 } }),
+  h('div', { className: 'text-[10px] font-semibold uppercase tracking-wide text-slate-500', key: 'heading' }, data.heading),
+  h('div', { className: 'mt-1 break-words text-xs font-semibold text-slate-900', key: 'name' }, data.fullLabel),
+]);
+const NODE_TYPES = { csdm: CsdmNode };
 const App = () => {
   const [version, setVersion] = useState('5') as [CsdmVersion, (value: CsdmVersion) => void];
   const [records, setRecords] = useState([]) as [CsdmRecord[], (value: CsdmRecord[]) => void];
@@ -153,18 +171,27 @@ const App = () => {
   [records, environment, criticality, search]) as CsdmRecord[];
   const graph = useMemo(() => createGraph(filtered, version, view), [filtered, version, view]);
   const flowNodes = useMemo(() => graph.nodes.map((n: Graph['nodes'][number]) => ({
-    id: n.id, type: 'default', data: { label: LABELS[version][n.kind] + '\n' + n.label, kind: n.kind, fullLabel: n.label },
+    id: n.id, type: 'csdm',
+    data: { heading: LABELS[version][n.kind], kind: n.kind, fullLabel: n.label },
     position: { x: n.x, y: n.y },
-    style: { width: 245, whiteSpace: 'pre-line', borderRadius: 10, fontSize: 12, color: '#0f2544',
-      border: '1px solid #94a3b8', background: n.kind === 'service_instance' ? '#e0f2fe' : '#f8fafc',
-      padding: 8 },
   })), [graph, version]);
-  const flowEdges = useMemo(() => graph.edges.map((e: Graph['edges'][number]) => ({
-    id: e.id, source: e.source, target: e.target, label: e.label,
-    labelStyle: { fontSize: 9, fill: '#334155' }, style: { stroke: e.relationType === 'Reference' ? '#94a3b8' : '#2563eb',
-      strokeDasharray: e.relationType === 'Reference' ? '5 4' : undefined },
-    markerEnd: { type: 'arrowclosed' },
-  })), [graph]);
+  const flowEdges = useMemo(() => {
+    const positions = new Map(graph.nodes.map((node) => [node.id, node.x]));
+    return graph.edges.map((e: Graph['edges'][number]) => {
+      const toRight = (positions.get(e.source) ?? 0) < (positions.get(e.target) ?? 0);
+      return {
+        id: e.id, source: e.source, target: e.target, label: e.label,
+        sourceHandle: toRight ? 'source-right' : 'source-left',
+        targetHandle: toRight ? 'target-left' : 'target-right',
+        type: 'smoothstep', pathOptions: { borderRadius: 12, offset: 18 },
+        labelStyle: { fontSize: 9, fill: '#334155', fontWeight: 600 },
+        labelBgStyle: { fill: '#ffffff', fillOpacity: 0.9 }, labelBgPadding: [5, 3],
+        style: { strokeWidth: 1.6, stroke: e.relationType === 'Reference' ? '#94a3b8' : '#2563eb',
+          strokeDasharray: e.relationType === 'Reference' ? '5 4' : undefined },
+        markerEnd: { type: MarkerType.ArrowClosed },
+      };
+    });
+  }, [graph]);
   const envOptions = Array.from(new Set(records.map((r: CsdmRecord) => r.environment).filter(Boolean))).sort() as string[];
   const critOptions = Array.from(new Set(records.map((r: CsdmRecord) => r.criticality).filter(Boolean))).sort() as string[];
   const visibleRows = new Set(filtered.map((r) => records.indexOf(r) + 2));
@@ -306,7 +333,7 @@ const App = () => {
         graph.truncated ? h('p', { className: 'border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900', key: 'limit' },
           'Diagram limited to the first 120 unique nodes (' + graph.totalNodes + ' in the current filter). Narrow the filters to inspect other entities.') : null,
         h('div', { className: 'h-[540px] bg-slate-50', key: 'canvas' },
-          h(FlowCanvas, { nodes: flowNodes, edges: flowEdges, fitView: true, minZoom: 0.12,
+          h(FlowCanvas, { nodes: flowNodes, edges: flowEdges, nodeTypes: NODE_TYPES, fitView: true, minZoom: 0.12,
             onNodeClick: (_event: unknown, node: { id: string; data: { kind: EntityKind; fullLabel: string } }) =>
               setSelectedNode({ id: node.id, kind: node.data.kind, label: node.data.fullLabel }) }, [
               h(Background, { key: 'background' }), h(Controls, { key: 'controls' }), h(MiniMap, { key: 'map' }),
