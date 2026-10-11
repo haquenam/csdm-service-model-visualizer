@@ -111,3 +111,13 @@ test('diagram limits are explicit and filtered views contain only relevant nodes
 test('unrecognisable CSV reports a useful error', () => {
   assert.throws(() => parseRows([{ made_up: 'irrelevant' }], ['made_up'], '5'), /Cannot map/);
 });
+
+test('consumer offerings are placed adjacent to the technical model, not across a fixed 640px blank band', () => {
+  const graph = createGraph(standardSample(), '4', 'all');
+  const coreNodes = graph.nodes.filter((node) => node.kind !== 'business_offering' && node.kind !== 'business_service');
+  const consumer = graph.nodes.find((node) => node.kind === 'business_offering');
+  assert.ok(consumer, 'CSDM 4 Business Service Offering is represented');
+  const coreBottom = Math.max(...coreNodes.map((node) => node.y));
+  assert.ok(consumer.y > coreBottom, 'Consumer branch follows populated core rows');
+  assert.ok(consumer.y - coreBottom < 220, 'Consumer branch is not separated by a large empty band');
+});
