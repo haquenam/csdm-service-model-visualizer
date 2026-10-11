@@ -11,7 +11,7 @@ export type RecordKey = EntityKind | 'application_owner' | 'service_owner' | 'su
   'business_service_sys_id' | 'business_offering_sys_id';
 export type CsdmRecord = Record<RecordKey, string>;
 export type Finding = {
-  id: string; code: string; severity: Severity; row: number; entity: string;
+  id: string; code: string; severity: Severity; row: number; businessApplication: string; entity: string;
   currentValue: string; recommendation: string; status: 'Open' | 'In progress' | 'Resolved';
 };
 export type Analysis = {
@@ -171,7 +171,8 @@ export const analyse = (records: CsdmRecord[], version: CsdmVersion): Analysis =
   const add = (code: string, row: number, entity: string, currentValue: string): void => {
     const rule = guidance[code];
     findings.push({ id: code + ':' + row + ':' + findings.length, code, severity: rule.severity, row,
-      entity, currentValue, recommendation: rule.action, status: 'Open' });
+      businessApplication: records[row - 2]?.business_application || '', entity, currentValue,
+      recommendation: rule.action, status: 'Open' });
   };
   records.forEach((record, index) => {
     const row = index + 2; // spreadsheet row including header
@@ -224,6 +225,8 @@ export const analyse = (records: CsdmRecord[], version: CsdmVersion): Analysis =
       } else owners.set(businessAppId, key(record.application_owner));
     }
   });
+  const order: Record<Severity, number> = { High: 0, Medium: 1, Low: 2 };
+  findings.sort((a, b) => order[a.severity] - order[b.severity] || a.row - b.row);
   const counts = { High: 0, Medium: 0, Low: 0 };
   findings.forEach((finding) => { counts[finding.severity]++; });
   const weightedIssues = counts.High * 8 + counts.Medium * 4 + counts.Low * 2;
@@ -269,8 +272,8 @@ export const createGraph = (records: CsdmRecord[], version: CsdmVersion, view: M
     truncated: nodes.size > limit, totalNodes: nodes.size };
 };
 export const remediationCsv = (findings: Finding[]): string => [
-  'row,issue_type,severity,entity,current_value,recommended_action,remediation_status',
-  ...findings.map((f) => [f.row, f.code, f.severity, f.entity, f.currentValue, f.recommendation, f.status]
+  'business_application,row,issue_type,severity,entity,current_value,recommended_action,remediation_status',
+  ...findings.map((f) => [f.businessApplication, f.row, f.code, f.severity, f.entity, f.currentValue, f.recommendation, f.status]
     .map(formatCsvCell).join(',')),
 ].join('\r\n');
 export const reportMarkdown = (analysis: Analysis, version: CsdmVersion): string => [
@@ -279,9 +282,9 @@ export const reportMarkdown = (analysis: Analysis, version: CsdmVersion): string
   'Indicative readiness score: ' + analysis.score + '%', 'Findings: ' + analysis.findings.length, '',
   'Scoring method: 100 minus weighted findings (High 8, Medium 4, Low 2) divided by 32 per row.',
   'This score is advisory and not a CSDM certification.', '',
-  '| Row | Finding | Severity | Entity | Recommendation | Status |',
-  '| --- | --- | --- | --- | --- | --- |',
-  ...analysis.findings.map((f) => [f.row, f.code, f.severity, f.entity, f.recommendation, f.status]
+  '| Business Application | Row | Finding | Severity | Entity | Recommendation | Status |',
+  '| --- | --- | --- | --- | --- | --- | --- |',
+  ...analysis.findings.map((f) => [f.businessApplication, f.row, f.code, f.severity, f.entity, f.recommendation, f.status]
     .map((cell) => normal(cell).replace(/\|/g, '\\|').replace(/\n/g, ' ')).join(' | '))
     .map((line) => '| ' + line + ' |'),
   '', 'This tool is for educational review with synthetic or anonymised data only.',
