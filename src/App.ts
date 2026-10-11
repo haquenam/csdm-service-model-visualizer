@@ -274,7 +274,7 @@ const App = () => {
             h('select', { className: selectStyle, value: criticality, onChange: (e: Event) => setCriticality((e.target as HTMLSelectElement).value) }, options(critOptions))]),
           h('div', { className: 'md:col-span-2', key: 'search' }, [h(Label, {}, 'Find applications, offerings or owners'),
             h('input', { className: selectStyle, type: 'search', placeholder: 'Search across available fields', value: search,
-              onChange: (e: Event) => setSearch((e.target as HTMLInputElement).value })]),
+              onChange: (e: Event) => setSearch((e.target as HTMLInputElement).value) })]),
         ]),
         h('div', { className: 'mt-4 flex flex-wrap gap-2', key: 'views' },
           allViews.map((v) => h('button', { className: view === v.value ? primary : button, key: v.value,
@@ -342,7 +342,7 @@ const App = () => {
                         [f.id]: (e.target as HTMLSelectElement).value as Finding['status'] }) },
                     ['Open', 'In progress', 'Resolved'].map((s) => h('option', { key: s, value: s }, s)))),
                 ]))),
-            ]))),
+            ])),
       ]) : null,
       analysed ? h('section', { className: box + ' overflow-hidden', key: 'table' }, [
         h('div', { className: 'border-b border-slate-200 px-5 py-4', key: 'heading' }, [
