@@ -30,8 +30,8 @@ const exportText = (filename: string, value: string, type: string) => {
 const svgElement = (name: string) => document.createElementNS('http://www.w3.org/2000/svg', name);
 const pngExport = (graph: Graph, version: CsdmVersion, onError: (message: string) => void) => {
   if (!graph.nodes.length) return;
-  const width = 1300;
-  const height = Math.min(12000, Math.max(340, ...graph.nodes.map((n) => n.y + 135)));
+  const width = 1340;
+  const height = Math.min(12000, Math.max(330, ...graph.nodes.map((n) => n.y + 155)));
   const svg = svgElement('svg');
   svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   svg.setAttribute('width', String(width));
@@ -43,31 +43,69 @@ const pngExport = (graph: Graph, version: CsdmVersion, onError: (message: string
     svg.appendChild(rect);
   };
   addRect(0, 0, width, height, '#ffffff', '#ffffff');
-  const index = new Map(graph.nodes.map((n) => [n.id, n]));
+  const heading = svgElement('text');
+  heading.setAttribute('x', '16');
+  heading.setAttribute('y', '25');
+  heading.setAttribute('font-size', '16');
+  heading.setAttribute('font-family', 'Arial, sans-serif');
+  heading.setAttribute('font-weight', 'bold');
+  heading.setAttribute('fill', '#0f2544');
+  heading.textContent = 'CSDM ' + version + ' service relationship model';
+  svg.appendChild(heading);
+  const defs = svgElement('defs');
+  for (const [id, colour] of [['cmdb-arrow', '#2563eb'], ['ref-arrow', '#94a3b8']]) {
+    const marker = svgElement('marker');
+    for (const [key, value] of Object.entries({
+      id, markerWidth: 9, markerHeight: 9, refX: 8, refY: 4.5,
+      orient: 'auto', markerUnits: 'userSpaceOnUse',
+    })) marker.setAttribute(key, String(value));
+    const triangle = svgElement('path');
+    triangle.setAttribute('d', 'M 0 0 L 9 4.5 L 0 9 Z');
+    triangle.setAttribute('fill', colour);
+    marker.appendChild(triangle);
+    defs.appendChild(marker);
+  }
+  svg.appendChild(defs);
+  const index = new Map<string, Graph['nodes'][number]>(
+    graph.nodes.map((n: Graph['nodes'][number]) => [n.id, n]));
   graph.edges.forEach((edge) => {
     const source = index.get(edge.source);
     const target = index.get(edge.target);
     if (!source || !target) return;
-    const line = svgElement('line');
-    const left = source.x <= target.x;
-    for (const [key, value] of Object.entries({
-      x1: source.x + (left ? 240 : 0), y1: source.y + 30,
-      x2: target.x + (left ? 0 : 240), y2: target.y + 30,
-      stroke: edge.relationType === 'Reference' ? '#94a3b8' : '#2563eb',
-      'stroke-width': 2, 'stroke-dasharray': edge.relationType === 'Reference' ? '5 5' : 'none',
-    })) line.setAttribute(key, String(value));
+    const toRight = source.x < target.x;
+    const sourceX = source.x + (toRight ? 246 : 10);
+    const targetX = target.x + (toRight ? 10 : 246);
+    const sourceY = source.y + 37;
+    const targetY = target.y + 37;
+    const middleX = (sourceX + targetX) / 2;
+    const line = svgElement('path');
+    line.setAttribute('d', 'M ' + sourceX + ' ' + sourceY + ' H ' + middleX +
+      ' V ' + targetY + ' H ' + targetX);
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', edge.relationType === 'Reference' ? '#94a3b8' : '#2563eb');
+    line.setAttribute('stroke-width', '1.8');
+    line.setAttribute('marker-end', edge.relationType === 'Reference' ? 'url(#ref-arrow)' : 'url(#cmdb-arrow)');
+    if (edge.relationType === 'Reference') line.setAttribute('stroke-dasharray', '5 5');
     svg.appendChild(line);
+    // Full relationship strings are available in the interactive graph;
+    // short printable labels fit between adjacent PNG columns.
+    const shortLabel = edge.label.startsWith('Consumes::') ? 'Consumes'
+      : edge.label.startsWith('Uses::') ? 'Uses'
+        : edge.label.startsWith('Contains::') ? 'Contains'
+          : edge.label.startsWith('Depends on::') ? 'Depends on'
+            : edge.label.includes('(reference)') ? 'Parent' : edge.label.slice(0, 16);
+    const labelY = Math.abs(sourceY - targetY) < 8 ? sourceY - 13 : (sourceY + targetY) / 2 - 8;
+    const labelWidth = Math.max(46, shortLabel.length * 6.2 + 12);
+    addRect(middleX - labelWidth / 2, labelY - 13, labelWidth, 17, '#ffffff', '#e2e8f0');
     const label = svgElement('text');
-    label.setAttribute('x', String((source.x + target.x + 240) / 2));
-    label.setAttribute('y', String((source.y + target.y) / 2 + 22));
+    label.setAttribute('x', String(middleX));
+    label.setAttribute('y', String(labelY));
     label.setAttribute('font-size', '10');
+    label.setAttribute('font-weight', 'bold');
     label.setAttribute('font-family', 'Arial, sans-serif');
     label.setAttribute('text-anchor', 'middle');
     label.setAttribute('fill', '#334155');
-    label.setAttribute('stroke', '#ffffff');
-    label.setAttribute('stroke-width', '3');
-    label.setAttribute('paint-order', 'stroke');
-    label.textContent = edge.label;
+    label.textContent = shortLabel;
     svg.appendChild(label);
   });
   graph.nodes.forEach((node) => {
@@ -89,6 +127,14 @@ const pngExport = (graph: Graph, version: CsdmVersion, onError: (message: string
     text.appendChild(value);
     svg.appendChild(text);
   });
+  const legend = svgElement('text');
+  legend.setAttribute('x', '16');
+  legend.setAttribute('y', String(height - 25));
+  legend.setAttribute('font-size', '12');
+  legend.setAttribute('font-family', 'Arial, sans-serif');
+  legend.setAttribute('fill', '#475569');
+  legend.textContent = 'Blue arrows: CMDB relationships   |   Grey dashed arrows: parent references. Labels are abbreviated.';
+  svg.appendChild(legend);
   const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml;charset=utf-8' });
   const source = URL.createObjectURL(blob);
   const img = new Image();
