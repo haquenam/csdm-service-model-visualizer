@@ -1,7 +1,8 @@
 import {
   type CsdmVersion, type ModelView, type CsdmRecord, type Finding, type Graph, type EntityKind,
   FIELDS, CORE_FIELDS, ENTITY_FIELDS, LABELS, expectedHeaders, standardSample, toCsv,
-  parseRows, analyse, createGraph, remediationCsv, reportMarkdown, normal,
+  parseRows, analyse, createGraph, preparePngGraph, calculatePngRoutes,
+  remediationCsv, reportMarkdown, normal,
 } from './model.js';
 declare const React: any;
 declare const ReactDOM: any;
@@ -28,7 +29,10 @@ const exportText = (filename: string, value: string, type: string) => {
   window.setTimeout(() => URL.revokeObjectURL(url), 500);
 };
 const svgElement = (name: string) => document.createElementNS('http://www.w3.org/2000/svg', name);
-const pngExport = (graph: Graph, version: CsdmVersion, onError: (message: string) => void) => {
+const pngExport = (sourceGraph: Graph, version: CsdmVersion, view: ModelView,
+  onError: (message: string) => void) => {
+  const prepared = preparePngGraph(sourceGraph, view);
+  const graph = prepared.graph;
   if (!graph.nodes.length) return;
   const width = 1340;
   const height = Math.min(12000, Math.max(330, ...graph.nodes.map((n) => n.y + 155)));
@@ -66,21 +70,36 @@ const pngExport = (graph: Graph, version: CsdmVersion, onError: (message: string
     defs.appendChild(marker);
   }
   svg.appendChild(defs);
-  const index = new Map<string, Graph['nodes'][number]>(
-    graph.nodes.map((n: Graph['nodes'][number]) => [n.id, n]));
+  if (prepared.consumerSectionY !== null) {
+    const separator = svgElement('line');
+    separator.setAttribute('x1', '16');
+    separator.setAttribute('x2', String(width - 16));
+    separator.setAttribute('y1', String(prepared.consumerSectionY - 64));
+    separator.setAttribute('y2', String(prepared.consumerSectionY - 64));
+    separator.setAttribute('stroke', '#cbd5e1');
+    separator.setAttribute('stroke-dasharray', '6 5');
+    svg.appendChild(separator);
+    const section = svgElement('text');
+    section.setAttribute('x', '16');
+    section.setAttribute('y', String(prepared.consumerSectionY - 42));
+    section.setAttribute('font-size', '12');
+    section.setAttribute('font-family', 'Arial, sans-serif');
+    section.setAttribute('font-weight', 'bold');
+    section.setAttribute('fill', '#315a7d');
+    section.textContent = 'SERVICE CONSUMPTION | Service Instances are repeated for readability (not additional CIs)';
+    svg.appendChild(section);
+  }
+  const routes = calculatePngRoutes(graph);
   graph.edges.forEach((edge) => {
-    const source = index.get(edge.source);
-    const target = index.get(edge.target);
-    if (!source || !target) return;
-    const toRight = source.x < target.x;
-    const sourceX = source.x + (toRight ? 246 : 10);
-    const targetX = target.x + (toRight ? 10 : 246);
-    const sourceY = source.y + 37;
-    const targetY = target.y + 37;
-    const middleX = (sourceX + targetX) / 2;
+    const route = routes.get(edge.id);
+    if (!route) return;
+    const { startX: sourceX, startY: sourceY, endX: targetX, endY: targetY, laneX: middleX } = route;
     const line = svgElement('path');
-    line.setAttribute('d', 'M ' + sourceX + ' ' + sourceY + ' H ' + middleX +
-      ' V ' + targetY + ' H ' + targetX);
+    const path = Math.abs(sourceY - targetY) < 1
+      ? 'M ' + sourceX + ' ' + sourceY + ' H ' + targetX
+      : 'M ' + sourceX + ' ' + sourceY + ' H ' + middleX +
+        ' V ' + targetY + ' H ' + targetX;
+    line.setAttribute('d', path);
     line.setAttribute('fill', 'none');
     line.setAttribute('stroke', edge.relationType === 'Reference' ? '#94a3b8' : '#2563eb');
     line.setAttribute('stroke-width', '1.8');
@@ -374,7 +393,7 @@ const App = () => {
             h('p', { className: 'mt-1 text-xs text-slate-500', key: 'help' },
               'Blue lines are CMDB relationships; dashed grey lines are parent references. Click a node to inspect its identity.'),
           ]),
-          h('button', { className: button, disabled: !graph.nodes.length, onClick: () => pngExport(graph, version, setError), key: 'png' }, 'Export PNG'),
+          h('button', { className: button, disabled: !graph.nodes.length, onClick: () => pngExport(graph, version, view, setError), key: 'png' }, 'Export PNG'),
         ]),
         graph.truncated ? h('p', { className: 'border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900', key: 'limit' },
           'Diagram limited to the first 120 unique nodes (' + graph.totalNodes + ' in the current filter). Narrow the filters to inspect other entities.') : null,
