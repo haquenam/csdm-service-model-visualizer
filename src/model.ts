@@ -277,6 +277,117 @@ export const createGraph = (records: CsdmRecord[], version: CsdmVersion, view: M
   return { nodes: selectedNodes, edges: Array.from(edges.values()).filter((edge) => selected.has(edge.source) && selected.has(edge.target)),
     truncated: nodes.size > limit, totalNodes: nodes.size };
 };
+/** Prepare an export-only graph. In the end-to-end view, consumer relationships
+ * sit in a separate lane with intentionally repeated Service Instance cards.
+ * This avoids a misleading long crossing through Technology Management Offering
+ * relationships in the main graph. These are repeated representations, not new CIs. */
+export const preparePngGraph = (graph: Graph, view: ModelView): {
+  graph: Graph; consumerSectionY: number | null
+} => {
+  if (view !== 'all') return { graph, consumerSectionY: null };
+  const byId = new Map(graph.nodes.map((node) => [node.id, node]));
+  const consumerKinds = new Set<EntityKind>(['business_service', 'business_offering']);
+  const coreNodes = graph.nodes.filter((node) => !consumerKinds.has(node.kind));
+  const coreEdges = graph.edges.filter((edge) =>
+    !consumerKinds.has(byId.get(edge.source)?.kind as EntityKind) &&
+    !consumerKinds.has(byId.get(edge.target)?.kind as EntityKind));
+  const links = graph.edges.filter((edge) =>
+    byId.get(edge.source)?.kind === 'business_offering' && byId.get(edge.target)?.kind === 'service_instance');
+  if (!links.length) {
+    // Retain orphaned consumer nodes for inspection when no consumer link exists.
+    return { graph, consumerSectionY: null };
+  }
+  const coreBottom = Math.max(50, ...coreNodes.map((node) => node.y));
+  const consumerSectionY = coreBottom + 180;
+  const extraNodes: GraphNode[] = [];
+  const extraEdges: GraphEdge[] = [];
+  const usedOfferingIds = new Set<string>();
+  links.forEach((link, index) => {
+    const offering = byId.get(link.source);
+    const instance = byId.get(link.target);
+    if (!offering || !instance) return;
+    const y = consumerSectionY + index * 124;
+    const instId = 'png-consumer-instance:' + index;
+    const offerId = 'png-consumer-offering:' + index;
+    usedOfferingIds.add(offering.id);
+    extraNodes.push({ ...instance, id: instId, x: 340, y });
+    extraNodes.push({ ...offering, id: offerId, x: 680, y });
+    extraEdges.push({ ...link, id: 'png-consumer-link:' + index, source: offerId, target: instId });
+    graph.edges.filter((edge) => edge.target === offering.id &&
+      byId.get(edge.source)?.kind === 'business_service').forEach((parentEdge, parentIndex) => {
+      const service = byId.get(parentEdge.source);
+      if (!service) return;
+      const serviceId = 'png-consumer-service:' + index + ':' + parentIndex;
+      extraNodes.push({ ...service, id: serviceId, x: 1020, y });
+      extraEdges.push({ ...parentEdge, id: 'png-parent:' + index + ':' + parentIndex,
+        source: serviceId, target: offerId });
+    });
+  });
+  const orphaned = graph.nodes.filter((node) =>
+    node.kind === 'business_offering' && !usedOfferingIds.has(node.id));
+  orphaned.forEach((offering, index) => {
+    const row = links.length + index;
+    const y = consumerSectionY + row * 124;
+    const offerId = 'png-orphan-offering:' + index;
+    extraNodes.push({ ...offering, id: offerId, x: 680, y });
+    graph.edges.filter((edge) => edge.target === offering.id &&
+      byId.get(edge.source)?.kind === 'business_service').forEach((parentEdge, parentIndex) => {
+      const service = byId.get(parentEdge.source);
+      if (!service) return;
+      const serviceId = 'png-orphan-service:' + index + ':' + parentIndex;
+      extraNodes.push({ ...service, id: serviceId, x: 1020, y });
+      extraEdges.push({ ...parentEdge, id: 'png-orphan-parent:' + index + ':' + parentIndex,
+        source: serviceId, target: offerId });
+    });
+  });
+  return {
+    graph: { ...graph, nodes: [...coreNodes, ...extraNodes], edges: [...coreEdges, ...extraEdges],
+      totalNodes: coreNodes.length + extraNodes.length },
+    consumerSectionY,
+  };
+};
+
+export type PngEdgeRoute = {
+  startX: number; startY: number; endX: number; endY: number; laneX: number;
+};
+/** Routes each unrelated relationship through its own horizontal gutter channel.
+ * Using one shared midpoint made two different edges look like a false join. */
+export const calculatePngRoutes = (graph: Graph): Map<string, PngEdgeRoute> => {
+  const byId = new Map(graph.nodes.map((node) => [node.id, node]));
+  const groups = new Map<string, { id: string; route: PngEdgeRoute }[]>();
+  graph.edges.forEach((edge) => {
+    const source = byId.get(edge.source);
+    const target = byId.get(edge.target);
+    if (!source || !target || source.x === target.x) return;
+    const toRight = source.x < target.x;
+    const startX = source.x + (toRight ? 246 : 10);
+    const endX = target.x + (toRight ? 10 : 246);
+    const left = Math.min(startX, endX);
+    const right = Math.max(startX, endX);
+    const key = left + ':' + right;
+    const group = groups.get(key) ?? [];
+    group.push({ id: edge.id, route: {
+      startX, endX, startY: source.y + 37, endY: target.y + 37,
+      laneX: (startX + endX) / 2,
+    } });
+    groups.set(key, group);
+  });
+  const routes = new Map<string, PngEdgeRoute>();
+  groups.forEach((group) => {
+    group.sort((a, b) => a.route.startY - b.route.startY ||
+      a.route.endY - b.route.endY || a.id.localeCompare(b.id));
+    group.forEach((item, index) => {
+      const left = Math.min(item.route.startX, item.route.endX);
+      const right = Math.max(item.route.startX, item.route.endX);
+      const margin = 8;
+      const usable = Math.max(8, right - left - margin * 2);
+      const laneX = left + margin + usable * ((index + 1) / (group.length + 1));
+      routes.set(item.id, { ...item.route, laneX });
+    });
+  });
+  return routes;
+};
+
 export const remediationCsv = (findings: Finding[]): string => [
   'business_application,row,issue_type,severity,entity,current_value,recommended_action,remediation_status',
   ...findings.map((f) => [f.businessApplication, f.row, f.code, f.severity, f.entity, f.currentValue, f.recommendation, f.status]
