@@ -248,13 +248,19 @@ export const createGraph = (records: CsdmRecord[], version: CsdmVersion, view: M
   const edges = new Map<string, GraphEdge>();
   const rowsByKind = new Map<EntityKind, number>();
   const relations = relationships(version);
+  // Position the optional consumer branch immediately after the populated core rows.
+  // The previous fixed 640px offset produced a large empty band in small diagrams.
+  const coreKinds: EntityKind[] = ['business_application', 'service_instance', 'technology_management_offering', 'technology_management_service'];
+  const coreDepth = Math.max(1, ...coreKinds.map((kind) =>
+    new Set(records.map((record) => entityId(record, kind)).filter(Boolean)).size));
+  const consumptionOffset = (coreDepth + 0.25) * 114;
   records.forEach((record) => {
     visible.forEach((kind) => {
       const id = entityId(record, kind);
       if (!id || nodes.has(id)) return;
       const row = rowsByKind.get(kind) ?? 0;
       rowsByKind.set(kind, row + 1);
-      const yOffset = view === 'all' && (kind === 'business_service' || kind === 'business_offering') ? 640 : 0;
+      const yOffset = view === 'all' && (kind === 'business_service' || kind === 'business_offering') ? consumptionOffset : 0;
       nodes.set(id, { id, kind, label: record[kind], x: POSITION[kind], y: 50 + yOffset + row * 114 });
     });
     relations.forEach((relation) => {
