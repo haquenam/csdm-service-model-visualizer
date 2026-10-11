@@ -42,7 +42,7 @@ Exact row duplicates are flagged. Repeated service instances shared across disti
 - [x] Inspect parent and owner conflicts and mandatory field gaps.
 - [x] Deliver four graph views, filtering, PNG export and remediation outputs.
 - [x] Cover pure model routines with unit tests.
-- [ ] CI compile/test run completed successfully.
+- [x] CI compile/test run completed successfully (TypeScript build and 11 model tests).
 - [ ] Real-browser acceptance of CSV import, filters, exports, diagram and layout.
 - [ ] Validate representative synthetic v4 and v5 extracts with domain SMEs.
 - [ ] Explicit production merge and public release approval.
