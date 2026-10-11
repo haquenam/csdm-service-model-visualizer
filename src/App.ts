@@ -176,7 +176,7 @@ const App = () => {
     position: { x: n.x, y: n.y },
   })), [graph, version]);
   const flowEdges = useMemo(() => {
-    const positions = new Map(graph.nodes.map((node) => [node.id, node.x]));
+    const positions = new Map(graph.nodes.map((node: Graph['nodes'][number]) => [node.id, node.x]));
     return graph.edges.map((e: Graph['edges'][number]) => {
       const toRight = (positions.get(e.source) ?? 0) < (positions.get(e.target) ?? 0);
       return {
