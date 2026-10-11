@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   analyse, createGraph, emptyRecord, expectedHeaders, formatCsvCell, parseRows,
   remediationCsv, relationships, standardSample, toCsv, LABELS,
+  preparePngGraph, calculatePngRoutes,
 } from '../dist/assets/model.js';
 
 test('CSDM 4/5 labels and CMDB relationship types differ where required', () => {
@@ -120,4 +121,43 @@ test('consumer offerings are placed adjacent to the technical model, not across 
   const coreBottom = Math.max(...coreNodes.map((node) => node.y));
   assert.ok(consumer.y > coreBottom, 'Consumer branch follows populated core rows');
   assert.ok(consumer.y - coreBottom < 220, 'Consumer branch is not separated by a large empty band');
+});
+
+test('PNG separates consumer relationships from technical offering relationships', () => {
+  const source = createGraph(standardSample(), '5', 'all');
+  const { graph, consumerSectionY } = preparePngGraph(source, 'all');
+  assert.ok(consumerSectionY !== null);
+  const instances = graph.nodes.filter((node) => node.kind === 'service_instance');
+  assert.equal(instances.length, 3, 'the consumer view repeats one Service Instance deliberately');
+  const businessEdges = graph.edges.filter((edge) => edge.label === 'Depends on::Used by');
+  assert.equal(businessEdges.length, 1);
+  assert.ok(businessEdges[0].source.startsWith('png-consumer-offering:'));
+  assert.ok(businessEdges[0].target.startsWith('png-consumer-instance:'));
+  const consumerNode = graph.nodes.find((node) => node.id === businessEdges[0].target);
+  assert.ok(consumerNode.y >= consumerSectionY);
+  const techNodes = graph.nodes.filter((node) => node.kind === 'technology_management_offering');
+  assert.ok(techNodes.every((node) => node.y < consumerSectionY - 64));
+});
+
+test('PNG application edges use distinct lanes when sharing a narrow column gutter', () => {
+  const source = createGraph(standardSample(), '5', 'all');
+  const { graph } = preparePngGraph(source, 'all');
+  const routes = calculatePngRoutes(graph);
+  const appEdges = graph.edges.filter((edge) => edge.label === 'Uses::Used by');
+  assert.equal(appEdges.length, 3);
+  const lanes = appEdges.map((edge) => routes.get(edge.id)?.laneX);
+  assert.equal(new Set(lanes).size, 3, 'distinct lanes prevent a false visual join');
+  const middleRoute = routes.get(appEdges[1].id);
+  const lastRoute = routes.get(appEdges[2].id);
+  assert.ok(middleRoute && lastRoute);
+  assert.notEqual(middleRoute.laneX, lastRoute.laneX);
+  assert.ok(middleRoute.laneX < lastRoute.laneX,
+    'source-to-lane and lane-to-target horizontal segments stay visibly separate');
+});
+
+test('consumer-only PNG view does not repeat instances unnecessarily', () => {
+  const graph = createGraph(standardSample(), '4', 'consumption');
+  const prepared = preparePngGraph(graph, 'consumption');
+  assert.equal(prepared.consumerSectionY, null);
+  assert.deepEqual(prepared.graph, graph);
 });
