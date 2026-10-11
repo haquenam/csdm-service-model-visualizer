@@ -57,6 +57,18 @@ const pngExport = (graph: Graph, version: CsdmVersion, onError: (message: string
       'stroke-width': 2, 'stroke-dasharray': edge.relationType === 'Reference' ? '5 5' : 'none',
     })) line.setAttribute(key, String(value));
     svg.appendChild(line);
+    const label = svgElement('text');
+    label.setAttribute('x', String((source.x + target.x + 240) / 2));
+    label.setAttribute('y', String((source.y + target.y) / 2 + 22));
+    label.setAttribute('font-size', '10');
+    label.setAttribute('font-family', 'Arial, sans-serif');
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('fill', '#334155');
+    label.setAttribute('stroke', '#ffffff');
+    label.setAttribute('stroke-width', '3');
+    label.setAttribute('paint-order', 'stroke');
+    label.textContent = edge.label;
+    svg.appendChild(label);
   });
   graph.nodes.forEach((node) => {
     addRect(node.x + 10, node.y + 2, 236, 70, node.kind === 'service_instance' ? '#e0f2fe' : '#f8fafc', '#94a3b8');
