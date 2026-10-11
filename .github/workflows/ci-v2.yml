@@ -1,0 +1,21 @@
+name: CSDM v2 validation
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [release/v2.0.0]
+permissions:
+  contents: read
+jobs:
+  typecheck-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci
+      - name: Compile TypeScript and run model tests
+        run: npm test

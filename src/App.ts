@@ -1,562 +1,477 @@
+import {
+  type CsdmVersion, type ModelView, type CsdmRecord, type Finding, type Graph, type EntityKind,
+  FIELDS, CORE_FIELDS, ENTITY_FIELDS, LABELS, expectedHeaders, standardSample, toCsv,
+  parseRows, analyse, createGraph, preparePngGraph, calculatePngRoutes,
+  remediationCsv, reportMarkdown, normal,
+} from './model.js';
 declare const React: any;
 declare const ReactDOM: any;
 declare const Papa: any;
 declare const ReactFlow: any;
-
-type CsdmRecord = {
-  business_application: string;
-  service_instance: string;
-  technical_management_service: string;
-  technical_service_offering: string;
-  application_owner: string;
-  support_group: string;
-  environment: string;
-  criticality: string;
-};
-
-type IssueSeverity = 'High' | 'Medium' | 'Low';
-
-type PriorityIssue = {
-  name: string;
-  severity: IssueSeverity;
-  count: number;
-  action: string;
-};
-
-type ValidationSummary = {
-  totalRecords: number;
-  validRecords: number;
-  missingOwner: number;
-  missingSupportGroup: number;
-  missingServiceInstance: number;
-  missingTechnicalServiceOffering: number;
-  duplicateServiceInstances: number;
-  readinessScore: number;
-};
-
-const SEVERITY_STYLES: Record<IssueSeverity, string> = {
-  High: 'border-red-200 bg-red-50 text-red-800 ring-red-100',
-  Medium: 'border-amber-200 bg-amber-50 text-amber-800 ring-amber-100',
-  Low: 'border-blue-200 bg-blue-50 text-blue-800 ring-blue-100',
-};
-
-const REQUIRED_COLUMNS: (keyof CsdmRecord)[] = [
-  'business_application',
-  'service_instance',
-  'technical_management_service',
-  'technical_service_offering',
-  'application_owner',
-  'support_group',
-  'environment',
-  'criticality',
-];
-
-
-type CsvGuidance = {
-  column: keyof CsdmRecord;
-  purpose: string;
-  example: string;
-  guidance: string;
-};
-
-const CSV_TEMPLATE_GUIDANCE: CsvGuidance[] = [
-  {
-    column: 'business_application',
-    purpose: 'Business application being reviewed or mapped.',
-    example: 'Salesforce',
-    guidance: 'Use the recognised application name used by architecture, portfolio or CMDB teams.',
-  },
-  {
-    column: 'service_instance',
-    purpose: 'Deployed or operational service instance.',
-    example: 'Salesforce Production',
-    guidance: 'Use a clear instance name that separates production, regional or major operational variants.',
-  },
-  {
-    column: 'technical_management_service',
-    purpose: 'Technical service responsible for managing or supporting the instance.',
-    example: 'CRM Platform Support',
-    guidance: 'Use the management or support service that owns the technical operation of the instance.',
-  },
-  {
-    column: 'technical_service_offering',
-    purpose: 'Specific technical service offering or support level.',
-    example: 'Gold Application Support',
-    guidance: 'Use the offering or support model that describes how the service is consumed or supported.',
-  },
-  {
-    column: 'application_owner',
-    purpose: 'Accountable owner for the business application.',
-    example: 'Jane Smith',
-    guidance: 'Use a named accountable owner where possible, not a generic team name.',
-  },
-  {
-    column: 'support_group',
-    purpose: 'Operational support group responsible for support.',
-    example: 'CRM Support Team',
-    guidance: 'Use the group that would own incidents, changes or operational support.',
-  },
-  {
-    column: 'environment',
-    purpose: 'Lifecycle environment for the record.',
-    example: 'Production',
-    guidance: 'Use values such as Production, UAT, Test or Development.',
-  },
-  {
-    column: 'criticality',
-    purpose: 'Business or operational criticality.',
-    example: 'High',
-    guidance: 'Use values such as Critical, High, Medium or Low.',
-  },
-];
-
-const SAMPLE_RECORDS: CsdmRecord[] = [
-  {
-    business_application: 'Customer Portal',
-    service_instance: 'Customer Portal - Production',
-    technical_management_service: 'Web Application Management',
-    technical_service_offering: 'Managed Web Application - Gold',
-    application_owner: 'Avery Chen',
-    support_group: 'Digital Experience Support',
-    environment: 'Production',
-    criticality: 'High',
-  },
-  {
-    business_application: 'Order Management',
-    service_instance: 'Order Management - Production',
-    technical_management_service: 'Commerce Platform Management',
-    technical_service_offering: 'Commerce Platform - Platinum',
-    application_owner: 'Morgan Patel',
-    support_group: 'Commerce Operations',
-    environment: 'Production',
-    criticality: 'Critical',
-  },
-  {
-    business_application: 'Employee Knowledge Base',
-    service_instance: 'Employee KB - UAT',
-    technical_management_service: 'Knowledge Platform Management',
-    technical_service_offering: 'Knowledge Platform - Standard',
-    application_owner: 'Jordan Smith',
-    support_group: 'IT Collaboration Services',
-    environment: 'UAT',
-    criticality: 'Medium',
-  },
-];
-
 const h = React.createElement;
 const { useMemo, useState } = React;
-const { ReactFlow: FlowCanvas, Background, Controls, MiniMap } = ReactFlow;
-
-const normalize = (value: unknown) => String(value ?? '').trim();
-
-const rowIsValid = (row: CsdmRecord) => REQUIRED_COLUMNS.every((column) => normalize(row[column]));
-
-const calculateSummary = (records: CsdmRecord[]): ValidationSummary => {
-  const serviceCounts = records.reduce<Record<string, number>>((acc, record) => {
-    const serviceInstance = normalize(record.service_instance).toLowerCase();
-    if (serviceInstance) acc[serviceInstance] = (acc[serviceInstance] ?? 0) + 1;
-    return acc;
-  }, {});
-  const duplicateServiceInstances = Object.values(serviceCounts).filter((count) => count > 1).length;
-  const missingOwner = records.filter((record) => !normalize(record.application_owner)).length;
-  const missingSupportGroup = records.filter((record) => !normalize(record.support_group)).length;
-  const missingServiceInstance = records.filter((record) => !normalize(record.service_instance)).length;
-  const missingTechnicalServiceOffering = records.filter((record) => !normalize(record.technical_service_offering)).length;
-  const validRecords = records.filter(rowIsValid).length;
-  const totalRecords = records.length;
-  const issueCount = missingOwner + missingSupportGroup + missingServiceInstance + missingTechnicalServiceOffering + duplicateServiceInstances;
-  const maxIssues = Math.max(totalRecords * 4, 1);
-  const readinessScore = totalRecords === 0 ? 0 : Math.max(0, Math.round(((maxIssues - issueCount) / maxIssues) * 100));
-
-  return {
-    totalRecords,
-    validRecords,
-    missingOwner,
-    missingSupportGroup,
-    missingServiceInstance,
-    missingTechnicalServiceOffering,
-    duplicateServiceInstances,
-    readinessScore,
-  };
-};
-
-const getPriorityIssues = (summary: ValidationSummary): PriorityIssue[] => ([
-  {
-    name: 'Missing service instance',
-    severity: 'High',
-    count: summary.missingServiceInstance,
-    action: 'Confirm or create the correct service instance before service model review.',
-  },
-  {
-    name: 'Duplicate service instance',
-    severity: 'High',
-    count: summary.duplicateServiceInstances,
-    action: 'Review naming and ownership to confirm whether records represent the same service instance or separate service instances.',
-  },
-  {
-    name: 'Missing technical service offering',
-    severity: 'Medium',
-    count: summary.missingTechnicalServiceOffering,
-    action: 'Define the technical service offering or support model before downstream governance.',
-  },
-  {
-    name: 'Missing support group',
-    severity: 'Medium',
-    count: summary.missingSupportGroup,
-    action: 'Assign the operational support group responsible for service ownership and support.',
-  },
-  {
-    name: 'Missing application owner',
-    severity: 'Low',
-    count: summary.missingOwner,
-    action: 'Confirm the accountable application owner before formal review.',
-  },
-] satisfies PriorityIssue[]).filter((issue) => issue.count > 0);
-
-const priorityIssuesToMarkdown = (issues: PriorityIssue[]) => issues.length === 0
-  ? 'No priority validation issues detected.'
-  : [
-    '| Issue | Severity | Count | Recommended action |',
-    '| --- | --- | --- | --- |',
-    ...issues.map((issue) => `| ${issue.name} | ${issue.severity} | ${issue.count} | ${issue.action} |`),
-  ].join('\n');
-
-const csvEscape = (value: string) => {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-};
-
-const recordsToCsv = (records: CsdmRecord[]) => [
-  REQUIRED_COLUMNS.join(','),
-  ...records.map((record) => REQUIRED_COLUMNS.map((column) => csvEscape(record[column])).join(',')),
-].join('\n');
-
-const downloadText = (filename: string, text: string, mimeType: string) => {
-  const blob = new Blob([text], { type: mimeType });
+const { ReactFlow: FlowCanvas, Background, Controls, MiniMap, Handle, Position, MarkerType } = ReactFlow;
+const chip = 'inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold';
+const button = 'rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40';
+const primary = 'rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40';
+const selectStyle = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800';
+const box = 'rounded-2xl border border-slate-200 bg-white shadow-sm';
+const format = (name: string) => name.replace(/_/g, ' ');
+const exportText = (filename: string, value: string, type: string) => {
+  const blob = new Blob([value], { type });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = filename;
+  document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 500);
 };
-
-const parseCsvFile = (file: File, setRecords: (records: CsdmRecord[]) => void, setError: (error: string) => void, onSuccess?: () => void) => {
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    complete: (result: { data: Record<string, unknown>[]; meta: { fields?: string[] }; errors: unknown[] }) => {
-      const headers = result.meta.fields ?? [];
-      const missingColumns = REQUIRED_COLUMNS.filter((column) => !headers.includes(column));
-      if (missingColumns.length > 0) {
-        setError(`Missing required column${missingColumns.length > 1 ? 's' : ''}: ${missingColumns.join(', ')}`);
-        setRecords([]);
-        return;
-      }
-      const parsedRecords = result.data.map((row) => REQUIRED_COLUMNS.reduce((record, column) => {
-        record[column] = normalize(row[column]);
-        return record;
-      }, {} as CsdmRecord));
-      setRecords(parsedRecords);
-      setError('');
-      onSuccess?.();
-    },
-    error: (error: Error) => setError(error.message),
+const svgElement = (name: string) => document.createElementNS('http://www.w3.org/2000/svg', name);
+const pngExport = (sourceGraph: Graph, version: CsdmVersion, view: ModelView,
+  onError: (message: string) => void) => {
+  const prepared = preparePngGraph(sourceGraph, view);
+  const graph = prepared.graph;
+  if (!graph.nodes.length) return;
+  const width = 1340;
+  const height = Math.min(12000, Math.max(330, ...graph.nodes.map((n) => n.y + 155)));
+  const svg = svgElement('svg');
+  svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  svg.setAttribute('width', String(width));
+  svg.setAttribute('height', String(height));
+  svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+  const addRect = (x: number, y: number, w: number, hh: number, fill: string, stroke: string) => {
+    const rect = svgElement('rect');
+    for (const [key, value] of Object.entries({ x, y, width: w, height: hh, rx: 9, fill, stroke })) rect.setAttribute(key, String(value));
+    svg.appendChild(rect);
+  };
+  addRect(0, 0, width, height, '#ffffff', '#ffffff');
+  const heading = svgElement('text');
+  heading.setAttribute('x', '16');
+  heading.setAttribute('y', '25');
+  heading.setAttribute('font-size', '16');
+  heading.setAttribute('font-family', 'Arial, sans-serif');
+  heading.setAttribute('font-weight', 'bold');
+  heading.setAttribute('fill', '#0f2544');
+  heading.textContent = 'CSDM ' + version + ' service relationship model';
+  svg.appendChild(heading);
+  const defs = svgElement('defs');
+  for (const [id, colour] of [['cmdb-arrow', '#2563eb'], ['ref-arrow', '#94a3b8']]) {
+    const marker = svgElement('marker');
+    for (const [key, value] of Object.entries({
+      id, markerWidth: 9, markerHeight: 9, refX: 8, refY: 4.5,
+      orient: 'auto', markerUnits: 'userSpaceOnUse',
+    })) marker.setAttribute(key, String(value));
+    const triangle = svgElement('path');
+    triangle.setAttribute('d', 'M 0 0 L 9 4.5 L 0 9 Z');
+    triangle.setAttribute('fill', colour);
+    marker.appendChild(triangle);
+    defs.appendChild(marker);
+  }
+  svg.appendChild(defs);
+  if (prepared.consumerSectionY !== null) {
+    const separator = svgElement('line');
+    separator.setAttribute('x1', '16');
+    separator.setAttribute('x2', String(width - 16));
+    separator.setAttribute('y1', String(prepared.consumerSectionY - 64));
+    separator.setAttribute('y2', String(prepared.consumerSectionY - 64));
+    separator.setAttribute('stroke', '#cbd5e1');
+    separator.setAttribute('stroke-dasharray', '6 5');
+    svg.appendChild(separator);
+    const section = svgElement('text');
+    section.setAttribute('x', '16');
+    section.setAttribute('y', String(prepared.consumerSectionY - 42));
+    section.setAttribute('font-size', '12');
+    section.setAttribute('font-family', 'Arial, sans-serif');
+    section.setAttribute('font-weight', 'bold');
+    section.setAttribute('fill', '#315a7d');
+    section.textContent = 'SERVICE CONSUMPTION | Service Instances are repeated for readability (not additional CIs)';
+    svg.appendChild(section);
+  }
+  const routes = calculatePngRoutes(graph);
+  graph.edges.forEach((edge) => {
+    const route = routes.get(edge.id);
+    if (!route) return;
+    const { startX: sourceX, startY: sourceY, endX: targetX, endY: targetY, laneX: middleX } = route;
+    const line = svgElement('path');
+    const path = Math.abs(sourceY - targetY) < 1
+      ? 'M ' + sourceX + ' ' + sourceY + ' H ' + targetX
+      : 'M ' + sourceX + ' ' + sourceY + ' H ' + middleX +
+        ' V ' + targetY + ' H ' + targetX;
+    line.setAttribute('d', path);
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', edge.relationType === 'Reference' ? '#94a3b8' : '#2563eb');
+    line.setAttribute('stroke-width', '1.8');
+    line.setAttribute('marker-end', edge.relationType === 'Reference' ? 'url(#ref-arrow)' : 'url(#cmdb-arrow)');
+    if (edge.relationType === 'Reference') line.setAttribute('stroke-dasharray', '5 5');
+    svg.appendChild(line);
+    // Full relationship strings are available in the interactive graph;
+    // short printable labels fit between adjacent PNG columns.
+    const shortLabel = edge.label.startsWith('Consumes::') ? 'Consumes'
+      : edge.label.startsWith('Uses::') ? 'Uses'
+        : edge.label.startsWith('Contains::') ? 'Contains'
+          : edge.label.startsWith('Depends on::') ? 'Depends on'
+            : edge.label.includes('(reference)') ? 'Parent' : edge.label.slice(0, 16);
+    const labelY = Math.abs(sourceY - targetY) < 8 ? sourceY - 13 : (sourceY + targetY) / 2 - 8;
+    const labelWidth = Math.max(46, shortLabel.length * 6.2 + 12);
+    addRect(middleX - labelWidth / 2, labelY - 13, labelWidth, 17, '#ffffff', '#e2e8f0');
+    const label = svgElement('text');
+    label.setAttribute('x', String(middleX));
+    label.setAttribute('y', String(labelY));
+    label.setAttribute('font-size', '10');
+    label.setAttribute('font-weight', 'bold');
+    label.setAttribute('font-family', 'Arial, sans-serif');
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('fill', '#334155');
+    label.textContent = shortLabel;
+    svg.appendChild(label);
   });
+  graph.nodes.forEach((node) => {
+    addRect(node.x + 10, node.y + 2, 236, 70, node.kind === 'service_instance' ? '#e0f2fe' : '#f8fafc', '#94a3b8');
+    const text = svgElement('text');
+    text.setAttribute('x', String(node.x + 20));
+    text.setAttribute('y', String(node.y + 24));
+    text.setAttribute('fill', '#0f2544');
+    text.setAttribute('font-family', 'Arial, sans-serif');
+    text.setAttribute('font-size', '12');
+    const label = svgElement('tspan');
+    label.setAttribute('font-weight', 'bold');
+    label.textContent = LABELS[version][node.kind];
+    text.appendChild(label);
+    const value = svgElement('tspan');
+    value.setAttribute('x', String(node.x + 20));
+    value.setAttribute('dy', '22');
+    value.textContent = node.label.length > 30 ? node.label.slice(0, 29) + '…' : node.label;
+    text.appendChild(value);
+    svg.appendChild(text);
+  });
+  const legend = svgElement('text');
+  legend.setAttribute('x', '16');
+  legend.setAttribute('y', String(height - 25));
+  legend.setAttribute('font-size', '12');
+  legend.setAttribute('font-family', 'Arial, sans-serif');
+  legend.setAttribute('fill', '#475569');
+  legend.textContent = 'Blue arrows: CMDB relationships   |   Grey dashed arrows: parent references. Labels are abbreviated.';
+  svg.appendChild(legend);
+  const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml;charset=utf-8' });
+  const source = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas not available');
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob((result) => {
+        if (!result) { onError('Unable to create PNG.'); return; }
+        const url = URL.createObjectURL(result);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'csdm-v2-diagram.png';
+        anchor.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 500);
+      }, 'image/png');
+    } catch (error) { onError(String(error)); }
+    finally { URL.revokeObjectURL(source); }
+  };
+  img.onerror = () => { URL.revokeObjectURL(source); onError('PNG rendering failed.'); };
+  img.src = source;
 };
-
-const compactLabel = (label: string, max = 30) => label.length > max ? `${label.slice(0, max - 1)}…` : label;
-
-const createDiagram = (records: CsdmRecord[]) => {
-  const unique = new Map<string, { id: string; label: string; type: string; x: number; y: number }>();
-  const edges: { id: string; source: string; target: string; animated?: boolean; style?: Record<string, string> }[] = [];
-  const columns = [
-    { key: 'business_application' as keyof CsdmRecord, type: 'Business Application', x: 0 },
-    { key: 'service_instance' as keyof CsdmRecord, type: 'Service Instance', x: 320 },
-    { key: 'technical_management_service' as keyof CsdmRecord, type: 'Technical Management Service', x: 640 },
-    { key: 'technical_service_offering' as keyof CsdmRecord, type: 'Technical Service Offering', x: 980 },
-  ];
-
-  records.slice(0, 35).forEach((record, rowIndex) => {
-    columns.forEach((column) => {
-      const value = normalize(record[column.key]);
-      if (!value) return;
-      const id = `${column.key}:${value}`;
-      if (!unique.has(id)) {
-        unique.set(id, { id, label: value, type: column.type, x: column.x, y: 0 });
-      }
-    });
-    for (let i = 0; i < columns.length - 1; i += 1) {
-      const sourceValue = normalize(record[columns[i].key]);
-      const targetValue = normalize(record[columns[i + 1].key]);
-      if (sourceValue && targetValue) {
-        const source = `${columns[i].key}:${sourceValue}`;
-        const target = `${columns[i + 1].key}:${targetValue}`;
-        const id = `${source}->${target}`;
-        if (!edges.some((edge) => edge.id === id)) edges.push({ id, source, target, animated: false, style: { stroke: '#315a7d' } });
-      }
-    }
-  });
-
-  const typeRows = new Map<string, number>();
-  const nodes = Array.from(unique.values()).map((node) => {
-    const row = typeRows.get(node.type) ?? 0;
-    typeRows.set(node.type, row + 1);
-    return {
-      id: node.id,
-      type: 'default',
-      data: { label: `${node.type}\n${compactLabel(node.label)}` },
-      position: { x: node.x, y: 60 + row * 110 },
-      style: {
-        background: node.type === 'Service Instance' ? '#e0f2fe' : '#ffffff',
-        border: '1px solid #93a4b8',
-        borderRadius: '10px',
-        color: '#0f2544',
-        fontSize: '12px',
-        padding: 8,
-        width: 220,
-      },
-    };
-  });
-
-  return { nodes, edges };
+const Label = ({ children }: { children: string }) =>
+  h('label', { className: 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500' }, children);
+const Stat = ({ label, value, detail }: { label: string; value: string | number; detail?: string }) =>
+  h('div', { className: box + ' p-5' }, [
+    h('p', { className: 'text-sm font-medium text-slate-500', key: 'l' }, label),
+    h('p', { className: 'mt-2 text-3xl font-semibold text-slate-900', key: 'v' }, String(value)),
+    detail ? h('p', { className: 'mt-1 text-xs text-slate-500', key: 'd' }, detail) : null,
+  ]);
+const severityStyle: Record<string, string> = {
+  High: 'border-red-200 bg-red-50 text-red-800',
+  Medium: 'border-amber-200 bg-amber-50 text-amber-800',
+  Low: 'border-blue-200 bg-blue-50 text-blue-800',
 };
-
-const generateMarkdownReport = (records: CsdmRecord[], summary: ValidationSummary) => `# CSDM Service Model Visualizer Report
-
-## Executive Summary
-
-- CSDM readiness score: ${summary.readinessScore}%
-- Total records: ${summary.totalRecords}
-- Valid records: ${summary.validRecords}
-- Records missing owner: ${summary.missingOwner}
-- Records missing support group: ${summary.missingSupportGroup}
-- Records missing service instance: ${summary.missingServiceInstance}
-- Records missing technical service offering: ${summary.missingTechnicalServiceOffering}
-- Duplicate service instances: ${summary.duplicateServiceInstances}
-
-## Priority Issues
-
-${priorityIssuesToMarkdown(getPriorityIssues(summary))}
-
-## Scope
-
-This browser-generated report maps Business Application to Service Instance to Technical Management Service to Technical Service Offering.
-
-## Records
-
-| Business Application | Service Instance | Technical Management Service | Technical Service Offering | Owner | Support Group | Environment | Criticality |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-${records.map((record) => `| ${REQUIRED_COLUMNS.map((column) => record[column] || '—').join(' | ')} |`).join('\n')}
-
-## Disclaimer
-
-This tool is for educational and architecture review purposes only. Do not upload confidential, customer, production, personal, regulated or sensitive data.
-`;
-
-const StatCard = ({ label, value, tone }: { label: string; value: string | number; tone?: string }) => h('div', { className: 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm' }, [
-  h('p', { className: 'text-sm text-slate-500', key: 'label' }, label),
-  h('p', { className: `mt-2 text-3xl font-semibold ${tone ?? 'text-navy'}`, key: 'value' }, value),
+// Dedicated directional handles stop React Flow's default top/bottom anchor routing
+// from making short CSDM relationships look like loops around each entity.
+const CsdmNode = ({ data }: { data: { kind: EntityKind; fullLabel: string; heading: string } }) => h('div', {
+  className: 'relative rounded-xl border border-slate-300 bg-white px-4 py-3 text-center shadow-sm',
+  style: { width: 246, minHeight: 70, backgroundColor: data.kind === 'service_instance' ? '#e0f2fe' : '#ffffff' },
+}, [
+  h(Handle, { key: 'target-left', id: 'target-left', type: 'target', position: Position.Left,
+    style: { opacity: 0, width: 8, height: 8 } }),
+  h(Handle, { key: 'target-right', id: 'target-right', type: 'target', position: Position.Right,
+    style: { opacity: 0, width: 8, height: 8 } }),
+  h(Handle, { key: 'source-left', id: 'source-left', type: 'source', position: Position.Left,
+    style: { opacity: 0, width: 8, height: 8 } }),
+  h(Handle, { key: 'source-right', id: 'source-right', type: 'source', position: Position.Right,
+    style: { opacity: 0, width: 8, height: 8 } }),
+  h('div', { className: 'text-[10px] font-semibold uppercase tracking-wide text-slate-500', key: 'heading' }, data.heading),
+  h('div', { className: 'mt-1 break-words text-xs font-semibold text-slate-900', key: 'name' }, data.fullLabel),
 ]);
-
-const SeverityBadge = ({ severity }: { severity: IssueSeverity }) => h('span', {
-  className: `inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ring-1 ${SEVERITY_STYLES[severity]}`,
-}, severity);
-
-
-const CsvTemplateGuidancePanel = () => h('div', { className: 'mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm', key: 'csv-guidance' }, [
-  h('div', { className: 'border-b border-slate-200 bg-white px-4 py-4 sm:px-5', key: 'intro' }, [
-    h('p', { className: 'text-sm font-semibold uppercase tracking-wide text-steel', key: 'eyebrow' }, 'CSV Template Guidance'),
-    h('h3', { className: 'mt-1 text-lg font-semibold text-navy', key: 'title' }, 'Required column reference'),
-    h('p', { className: 'mt-2 text-sm leading-6 text-slate-600', key: 'note' }, 'Use this guidance before preparing your CSV. The column names must match exactly because the browser side validator checks these headers during analysis.'),
-  ]),
-  h('div', { className: 'overflow-x-auto', key: 'tablewrap' },
-    h('table', { className: 'min-w-full divide-y divide-slate-200 text-sm', key: 'table' }, [
-      h('thead', { className: 'bg-slate-100', key: 'head' }, h('tr', {}, [
-        h('th', { className: 'whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700 sm:px-5', key: 'column' }, 'Column name'),
-        h('th', { className: 'min-w-[220px] px-4 py-3 text-left font-semibold text-slate-700', key: 'purpose' }, 'Purpose'),
-        h('th', { className: 'whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700', key: 'example' }, 'Example value'),
-        h('th', { className: 'min-w-[300px] px-4 py-3 text-left font-semibold text-slate-700 sm:pr-5', key: 'guidance' }, 'Guidance note'),
-      ])),
-      h('tbody', { className: 'divide-y divide-slate-100 bg-white', key: 'body' }, CSV_TEMPLATE_GUIDANCE.map((item) => h('tr', { key: item.column }, [
-        h('td', { className: 'whitespace-nowrap px-4 py-4 font-mono text-xs font-semibold text-navy sm:px-5', key: 'column' }, item.column),
-        h('td', { className: 'px-4 py-4 leading-6 text-slate-700', key: 'purpose' }, item.purpose),
-        h('td', { className: 'whitespace-nowrap px-4 py-4 font-medium text-slate-900', key: 'example' }, item.example),
-        h('td', { className: 'px-4 py-4 leading-6 text-slate-700 sm:pr-5', key: 'guidance' }, item.guidance),
-      ]))),
-    ])),
-]);
-
-const PriorityIssuesPanel = ({ issues }: { issues: PriorityIssue[] }) => h('div', { className: 'mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm', key: 'priority-issues' }, [
-  h('div', { className: 'border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6', key: 'head' }, [
-    h('p', { className: 'text-sm font-semibold uppercase tracking-wide text-steel', key: 'eyebrow' }, 'Validation prioritisation'),
-    h('h2', { className: 'mt-1 text-xl font-semibold text-navy', key: 'title' }, 'Priority Issues'),
-    h('p', { className: 'mt-1 text-sm text-slate-600', key: 'desc' }, 'Detected validation gaps are ordered by enterprise review urgency with severity, volume and recommended next action.'),
-  ]),
-  issues.length === 0
-    ? h('div', { className: 'px-4 py-6 text-sm font-medium text-emerald-800 sm:px-6', key: 'empty' }, 'No priority validation issues detected. Continue reviewing the relationship diagram and parsed records for model accuracy.')
-    : h('div', { className: 'overflow-x-auto', key: 'tablewrap' },
-      h('table', { className: 'min-w-full divide-y divide-slate-200 text-sm', key: 'table' }, [
-        h('thead', { className: 'bg-white', key: 'head' }, h('tr', {}, [
-          h('th', { className: 'whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700 sm:px-6', key: 'issue' }, 'Issue name'),
-          h('th', { className: 'whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700', key: 'severity' }, 'Severity'),
-          h('th', { className: 'whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700', key: 'count' }, 'Count'),
-          h('th', { className: 'min-w-[320px] px-4 py-3 text-left font-semibold text-slate-700 sm:pr-6', key: 'action' }, 'Recommended action'),
-        ])),
-        h('tbody', { className: 'divide-y divide-slate-100 bg-white', key: 'body' }, issues.map((issue) => h('tr', { className: issue.severity === 'High' ? 'bg-red-50/40' : '', key: issue.name }, [
-          h('td', { className: 'whitespace-nowrap px-4 py-4 font-semibold text-navy sm:px-6', key: 'name' }, issue.name),
-          h('td', { className: 'whitespace-nowrap px-4 py-4', key: 'severity' }, h(SeverityBadge, { severity: issue.severity })),
-          h('td', { className: 'whitespace-nowrap px-4 py-4 text-lg font-semibold text-slate-900', key: 'count' }, issue.count),
-          h('td', { className: 'px-4 py-4 leading-6 text-slate-700 sm:pr-6', key: 'action' }, issue.action),
-        ]))),
-      ])),
-]);
-
+const NODE_TYPES = { csdm: CsdmNode };
 const App = () => {
-  const [records, setRecords] = useState([]) as [CsdmRecord[], (records: CsdmRecord[]) => void];
+  const [version, setVersion] = useState('5') as [CsdmVersion, (value: CsdmVersion) => void];
+  const [records, setRecords] = useState([]) as [CsdmRecord[], (value: CsdmRecord[]) => void];
+  const [file, setFile] = useState(null) as [File | null, (value: File | null) => void];
+  const [fileKey, setFileKey] = useState(0);
+  const [analysed, setAnalysed] = useState(false);
   const [error, setError] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null) as [File | null, (file: File | null) => void];
-  const [hasAnalysisRun, setHasAnalysisRun] = useState(false);
-  const [uploadInputKey, setUploadInputKey] = useState(0);
-  const summary = useMemo(() => calculateSummary(records), [records]);
-  const diagram = useMemo(() => createDiagram(records), [records]);
-  const priorityIssues = useMemo(() => getPriorityIssues(summary), [summary]);
-
-  const uploadButtonClass = 'inline-flex cursor-pointer items-center justify-center rounded-lg border border-navy bg-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500';
-  const uploadButtonStyle = { backgroundColor: '#0f2544', color: '#ffffff' };
-  const secondaryButtonClass = 'inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50';
-  const workflowStepClass = 'rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm';
-
-  const handleUpload = (event: Event) => {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0] ?? null;
-    setSelectedFile(file);
-    setRecords([]);
-    setHasAnalysisRun(false);
-    setError('');
+  const [view, setView] = useState('all') as [ModelView, (value: ModelView) => void];
+  const [environment, setEnvironment] = useState('');
+  const [criticality, setCriticality] = useState('');
+  const [search, setSearch] = useState('');
+  const [statuses, setStatuses] = useState({}) as [Record<string, Finding['status']>, (value: Record<string, Finding['status']>) => void];
+  const [selectedNode, setSelectedNode] = useState(null) as [{ kind: EntityKind; id: string; label: string } | null,
+    (value: { kind: EntityKind; id: string; label: string } | null) => void];
+  const result = useMemo(() => analyse(records, version), [records, version]);
+  const findings = useMemo(() => result.findings.map((f: Finding) => ({
+    ...f, status: statuses[f.id] || f.status,
+  })), [result, statuses]) as Finding[];
+  const filtered = useMemo(() => records.filter((record: CsdmRecord) =>
+    (!environment || record.environment === environment) &&
+    (!criticality || record.criticality === criticality) &&
+    (!search || FIELDS.some((field) => record[field].toLowerCase().includes(search.toLowerCase())))),
+  [records, environment, criticality, search]) as CsdmRecord[];
+  const graph = useMemo(() => createGraph(filtered, version, view), [filtered, version, view]);
+  const flowNodes = useMemo(() => graph.nodes.map((n: Graph['nodes'][number]) => ({
+    id: n.id, type: 'csdm',
+    data: { heading: LABELS[version][n.kind], kind: n.kind, fullLabel: n.label },
+    position: { x: n.x, y: n.y },
+  })), [graph, version]);
+  const flowEdges = useMemo(() => {
+    const positions = new Map(graph.nodes.map((node: Graph['nodes'][number]) => [node.id, node.x]));
+    return graph.edges.map((e: Graph['edges'][number]) => {
+      const toRight = (positions.get(e.source) ?? 0) < (positions.get(e.target) ?? 0);
+      return {
+        id: e.id, source: e.source, target: e.target, label: e.label,
+        sourceHandle: toRight ? 'source-right' : 'source-left',
+        targetHandle: toRight ? 'target-left' : 'target-right',
+        type: 'smoothstep', pathOptions: { borderRadius: 12, offset: 18 },
+        labelStyle: { fontSize: 9, fill: '#334155', fontWeight: 600 },
+        labelBgStyle: { fill: '#ffffff', fillOpacity: 0.9 }, labelBgPadding: [5, 3],
+        style: { strokeWidth: 1.6, stroke: e.relationType === 'Reference' ? '#94a3b8' : '#2563eb',
+          strokeDasharray: e.relationType === 'Reference' ? '5 4' : undefined },
+        markerEnd: { type: MarkerType.ArrowClosed },
+      };
+    });
+  }, [graph]);
+  const envOptions = Array.from(new Set(records.map((r: CsdmRecord) => r.environment).filter(Boolean))).sort() as string[];
+  const critOptions = Array.from(new Set(records.map((r: CsdmRecord) => r.criticality).filter(Boolean))).sort() as string[];
+  const visibleRows = new Set(filtered.map((r) => records.indexOf(r) + 2));
+  const visibleFindings = findings.filter((f) => visibleRows.has(f.row));
+  const reset = () => {
+    setFile(null); setFileKey(fileKey + 1); setRecords([]); setAnalysed(false);
+    setStatuses({}); setEnvironment(''); setCriticality(''); setSearch(''); setSelectedNode(null); setError('');
   };
-
-  const handleRunAnalysis = () => {
-    if (!selectedFile) {
-      setError('Select a CSV file before running analysis.');
-      return;
-    }
-    parseCsvFile(selectedFile, setRecords, (message) => {
-      setError(message);
-      setHasAnalysisRun(false);
-    }, () => setHasAnalysisRun(true));
+  const run = () => {
+    if (!file) { setError('Select a CSV file first.'); return; }
+    Papa.parse(file, {
+      header: true, skipEmptyLines: true,
+      complete: (parsed: { data: Record<string, unknown>[]; meta: { fields?: string[] }; errors?: { message: string }[] }) => {
+        try {
+          if (parsed.errors?.length) throw new Error('CSV parsing error: ' + parsed.errors[0].message);
+          const next = parseRows(parsed.data, parsed.meta.fields || [], version);
+          if (!next.length) throw new Error('The file contains no data rows.');
+          setRecords(next); setAnalysed(true); setStatuses({}); setSelectedNode(null); setError('');
+        } catch (e) { setError(e instanceof Error ? e.message : String(e)); setRecords([]); setAnalysed(false); }
+      },
+      error: (e: Error) => { setError(e.message); setAnalysed(false); },
+    });
   };
-
-  const handleClearUploadedData = () => {
-    setSelectedFile(null);
-    setRecords([]);
-    setError('');
-    setHasAnalysisRun(false);
-    setUploadInputKey((current: number) => current + 1);
+  const onFileSelected = (event: Event) => {
+    const chosen = (event.target as HTMLInputElement).files?.[0] || null;
+    reset(); setFile(chosen);
   };
-
-  return h('main', { className: 'min-h-screen bg-gradient-to-b from-slate-50 to-white' }, [
-    h('section', { className: 'border-b border-slate-200 bg-white', key: 'hero' },
-      h('div', { className: 'mx-auto max-w-7xl px-6 py-10 lg:px-8' }, [
-        h('div', { className: 'inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-medium text-blue-800', key: 'eyebrow' }, 'Browser-only architecture review workspace'),
-        h('div', { className: 'mt-6 grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center', key: 'grid' }, [
-          h('div', { key: 'copy' }, [
-            h('h1', { className: 'text-4xl font-semibold tracking-tight text-navy md:text-6xl', key: 'title' }, 'CSDM Service Model Visualizer'),
-            h('p', { className: 'mt-5 max-w-3xl text-lg leading-8 text-slate-600', key: 'desc' }, 'Review how Business Applications connect through Service Instances, Technical Management Services and Technical Service Offerings. The CSV workflow is staged so architects can select a file, confirm it, then run analysis intentionally.'),
-            h('div', { className: 'mt-7 grid gap-3 sm:grid-cols-4', key: 'steps' }, [
-              h('div', { className: workflowStepClass, key: 'upload-step' }, '1. Upload CSV'),
-              h('div', { className: workflowStepClass, key: 'selected-step' }, '2. Selected file'),
-              h('div', { className: workflowStepClass, key: 'run-step' }, '3. Run Analysis'),
-              h('div', { className: workflowStepClass, key: 'review-step' }, '4. Review Results'),
-            ]),
-          ]),
-          h('div', { className: 'rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-sm', key: 'panel' }, [
-            h('p', { className: 'text-sm font-semibold uppercase tracking-wide text-steel', key: 'summarylabel' }, 'Executive Summary'),
-            h('p', { className: 'mt-4 text-5xl font-semibold text-navy', key: 'score' }, `${summary.readinessScore}%`),
-            h('p', { className: 'mt-2 text-sm text-slate-600', key: 'scorecopy' }, hasAnalysisRun ? 'CSDM readiness score based on required data completeness, owner and support coverage, service instance integrity and offering alignment.' : 'Select a CSV in the upload workspace and click Run Analysis to calculate the CSDM readiness score.'),
-            h('div', { className: 'mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-medium text-blue-900', key: 'status' }, hasAnalysisRun ? 'Analysis complete. Review the validation summary, relationship diagram, parsed records and export options below.' : 'Waiting for analysis. No uploaded CSV has been parsed yet.'),
-          ]),
+  const options = (values: string[]) => [
+    h('option', { key: '', value: '' }, 'All'),
+    ...values.map((v) => h('option', { key: v, value: v }, v)),
+  ];
+  const allViews: { value: ModelView; label: string }[] = [
+    { value: 'all', label: 'End-to-end' }, { value: 'application', label: 'Application' },
+    { value: 'delivery', label: 'Service Delivery' }, { value: 'consumption', label: 'Service Consumption' },
+  ];
+  const columns = FIELDS.filter((field) => !field.endsWith('_sys_id'));
+  return h('main', { className: 'min-h-screen bg-slate-50 text-slate-900' }, [
+    h('header', { className: 'border-b border-slate-800 bg-[#0f2544] text-white', key: 'hero' },
+      h('div', { className: 'mx-auto max-w-7xl px-5 py-9 lg:px-8' }, [
+        h('div', { className: 'flex flex-wrap items-center justify-between gap-3', key: 'eyebrow' }, [
+          h('p', { className: 'text-xs font-bold uppercase tracking-[.2em] text-sky-200', key: 'v' }, 'CSDM Visualizer / v2.0 workbench'),
+          h('span', { className: chip + ' border-sky-700 bg-sky-900 text-sky-100', key: 'b' }, 'Browser-only · no backend'),
         ]),
+        h('h1', { className: 'mt-4 text-3xl font-semibold tracking-tight sm:text-5xl', key: 'title' }, 'Service architecture, made inspectable.'),
+        h('p', { className: 'mt-3 max-w-3xl text-base leading-7 text-slate-200', key: 'intro' },
+          'Validate CSDM 4 and CSDM 5 service relationships, trace ownership and produce an actionable remediation register from a structured CSV export.'),
+        h('p', { className: 'mt-3 text-xs text-sky-200', key: 'disclaimer' },
+          'Independent educational tool. Not affiliated with or endorsed by ServiceNow. No compliance certification is implied.'),
       ])),
-    h('section', { className: 'mx-auto max-w-7xl px-6 py-8 lg:px-8', key: 'content' }, [
-      error ? h('div', { className: 'mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800', key: 'error' }, error) : null,
-      h('div', { className: 'mb-6 rounded-2xl border border-blue-200 bg-white p-6 shadow-sm ring-1 ring-blue-100', key: 'uploadarea' }, [
-        h('div', { className: 'grid gap-6 lg:grid-cols-[1fr_360px]', key: 'workspace' }, [
-          h('div', { key: 'text' }, [
-            h('p', { className: 'text-sm font-semibold uppercase tracking-wide text-blue-800', key: 'label' }, 'CSV upload area'),
-            h('h2', { className: 'mt-1 text-2xl font-semibold text-navy', key: 'title' }, 'Controlled review workspace'),
-            h('p', { className: 'mt-2 max-w-3xl text-sm text-slate-600', key: 'desc' }, 'Choose a CSV file with the required CSDM columns. The app will show the selected file name first and will not parse or analyse it until you click Run Analysis.'),
-            h('div', { className: 'mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium leading-6 text-amber-950', key: 'privacy' }, 'Files are processed locally in your browser. This tool does not intentionally upload your CSV to GitHub, store it in this repository, or send it to a backend server. Do not use confidential, customer, production, personal, regulated or sensitive data.'),
-            h(CsvTemplateGuidancePanel, { key: 'csv-guidance-panel' }),
-            h('div', { className: 'mt-5 flex flex-wrap gap-3', key: 'sample-actions' }, [
-              h('button', { className: secondaryButtonClass, onClick: () => downloadText('csdm-sample.csv', recordsToCsv(SAMPLE_RECORDS), 'text/csv'), key: 'sample' }, 'Download sample CSV template'),
-              hasAnalysisRun ? h('button', { className: secondaryButtonClass, onClick: handleClearUploadedData, key: 'clear' }, 'Clear uploaded data') : null,
-            ]),
+    h('div', { className: 'mx-auto max-w-7xl space-y-7 px-5 py-8 lg:px-8', key: 'body' }, [
+      h('section', { className: box + ' overflow-hidden', key: 'input' }, [
+        h('div', { className: 'border-b border-slate-200 bg-white px-6 py-5', key: 'heading' }, [
+          h('h2', { className: 'text-xl font-semibold text-slate-900', key: 't' }, '1. Configure and import'),
+          h('p', { className: 'mt-1 text-sm text-slate-600', key: 'd' },
+            'Choose the CSDM version, download its template or select an existing CSV. Analysis starts only when requested.'),
+        ]),
+        h('div', { className: 'grid gap-6 p-6 lg:grid-cols-[260px_1fr]', key: 'content' }, [
+          h('div', { key: 'version' }, [
+            h(Label, { key: 'label' }, 'CSDM model version'),
+            h('select', { className: selectStyle, 'aria-label': 'CSDM version', value: version,
+              onChange: (event: Event) => setVersion((event.target as HTMLSelectElement).value as CsdmVersion), key: 'select' },
+              [h('option', { value: '4', key: '4' }, 'CSDM 4'),
+                h('option', { value: '5', key: '5' }, 'CSDM 5')]),
+            h('div', { className: 'mt-3 rounded-lg bg-slate-100 px-3 py-3 text-xs leading-5 text-slate-600', key: 'desc' },
+              version === '5'
+                ? 'Uses Service Instance, Technology Management Service and Technology Management Offering.'
+                : 'Uses Application Service, Technical Service and Technical Service Offering.'),
           ]),
-          h('div', { className: 'rounded-2xl border border-slate-200 bg-slate-50 p-4', key: 'controls' }, [
-            h('div', { className: 'flex flex-col gap-3', key: 'control-stack' }, [
-              h('label', { className: uploadButtonClass, htmlFor: 'main-csv-upload', key: 'upload', style: uploadButtonStyle }, ['Upload CSV', h('input', { id: 'main-csv-upload', key: uploadInputKey, type: 'file', accept: '.csv,text/csv', className: 'sr-only', 'aria-label': 'Upload CSV file', onChange: handleUpload })]),
-              h('div', { className: 'rounded-xl border border-slate-200 bg-white p-4', key: 'selected' }, [
-                h('p', { className: 'text-xs font-semibold uppercase tracking-wide text-slate-500', key: 'label' }, 'Selected file'),
-                h('p', { className: `mt-2 break-words text-sm font-semibold ${selectedFile ? 'text-navy' : 'text-slate-500'}`, key: 'name' }, selectedFile ? selectedFile.name : 'No CSV selected'),
+          h('div', { key: 'file' }, [
+            h(Label, { key: 'l' }, 'CSV import'),
+            h('div', { className: 'flex flex-wrap items-center gap-3', key: 'actions' }, [
+              h('label', { className: primary + ' cursor-pointer', htmlFor: 'csv-file', key: 'upload' }, [
+                'Choose CSV', h('input', { id: 'csv-file', type: 'file', accept: '.csv,text/csv',
+                  className: 'sr-only', key: fileKey, onChange: onFileSelected }),
               ]),
-              h('button', { className: 'inline-flex items-center justify-center rounded-lg border border-navy bg-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50', disabled: !selectedFile, onClick: handleRunAnalysis, key: 'run', style: uploadButtonStyle }, 'Run Analysis'),
+              h('button', { className: button, onClick: () => exportText('csdm-v' + version + '-sample.csv',
+                toCsv(standardSample(), version), 'text/csv'), key: 'sample' }, 'Download v' + version + ' template'),
+              h('button', { className: primary, disabled: !file, onClick: run, key: 'run' }, 'Run analysis'),
+              h('button', { className: button, disabled: !file && !analysed, onClick: reset, key: 'clear' }, 'Clear'),
+            ]),
+            h('p', { className: 'mt-3 text-sm text-slate-600', key: 'selected' }, file ? 'Selected: ' + file.name :
+              'No file selected. You can also use the sample to explore the expected fields.'),
+            h('details', { className: 'mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4', key: 'guide' }, [
+              h('summary', { className: 'cursor-pointer text-sm font-semibold text-slate-800', key: 'title' },
+                'CSV field reference and legacy header support'),
+              h('div', { className: 'mt-3 flex flex-wrap gap-2', key: 'names' },
+                expectedHeaders(version).map((name: string) => h('code', {
+                  className: 'rounded bg-white px-2 py-1 text-xs text-slate-700', key: name }, name))),
+              h('p', { className: 'mt-3 text-xs leading-5 text-slate-600', key: 'note' },
+                'The first four entity fields are assessed for core completeness. Optional object sys_id columns preserve identity. Legacy v1 CSV labels and CSDM 4/5 alternatives are recognised where unambiguous.'),
             ]),
           ]),
         ]),
+        h('div', { className: 'border-t border-amber-200 bg-amber-50 px-6 py-3 text-xs leading-5 text-amber-900', key: 'privacy' },
+          'Local browser processing only. Use synthetic or suitably anonymised data. Do not upload client, production, confidential, regulated or personal data.'),
       ]),
-      h('div', { className: 'grid gap-4 sm:grid-cols-2 lg:grid-cols-4', key: 'stats' }, [
-        h(StatCard, { label: 'Total records', value: summary.totalRecords, key: 'total' }),
-        h(StatCard, { label: 'Valid records', value: summary.validRecords, tone: 'text-emerald-700', key: 'valid' }),
-        h(StatCard, { label: 'Missing owners', value: summary.missingOwner, tone: 'text-amber-700', key: 'owners' }),
-        h(StatCard, { label: 'Duplicate service instances', value: summary.duplicateServiceInstances, tone: 'text-red-700', key: 'dupes' }),
+      error ? h('div', { className: 'rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800', role: 'alert', key: 'error' }, error) : null,
+      h('section', { key: 'summary' }, [
+        h('div', { className: 'mb-3 flex items-end justify-between gap-3', key: 'heading' }, [
+          h('h2', { className: 'text-xl font-semibold', key: 'h' }, '2. Validation overview'),
+          h('span', { className: chip + ' border-slate-200 bg-white text-slate-600', key: 's' }, analysed ? 'Analysed · CSDM ' + version : 'Awaiting analysis'),
+        ]),
+        h('div', { className: 'grid gap-3 sm:grid-cols-2 lg:grid-cols-5', key: 'cards' }, [
+          h(Stat, { label: 'Readiness indicator', value: analysed ? result.score + '%' : '—', detail: 'Advisory, not certification', key: 'score' }),
+          h(Stat, { label: 'Rows', value: analysed ? result.total : '—', key: 'rows' }),
+          h(Stat, { label: 'Core-complete rows', value: analysed ? result.valid : '—', key: 'valid' }),
+          h(Stat, { label: 'High-priority findings', value: analysed ? result.counts.High : '—', key: 'high' }),
+          h(Stat, { label: 'Exact duplicate rows', value: analysed ? result.duplicates : '—', key: 'duplicates' }),
+        ]),
+        h('p', { className: 'mt-3 text-xs leading-5 text-slate-500', key: 'math' },
+          'Score = 100 − weighted findings ÷ (32 × rows) × 100, floored at zero. High = 8, Medium = 4, Low = 2. Repeated service references are not duplicates.'),
       ]),
-      h('div', { className: 'mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4', key: 'morestats' }, [
-        h(StatCard, { label: 'Missing support group', value: summary.missingSupportGroup, key: 'support' }),
-        h(StatCard, { label: 'Missing service instance', value: summary.missingServiceInstance, key: 'si' }),
-        h(StatCard, { label: 'Missing technical service offering', value: summary.missingTechnicalServiceOffering, key: 'tso' }),
-        h('div', { className: 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm', key: 'exports' }, [
-          h('p', { className: 'text-sm text-slate-500', key: 'label' }, 'Export reports'),
-          h('div', { className: 'mt-3 flex gap-2', key: 'buttons' }, [
-            h('button', { className: 'rounded-md bg-steel px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50', disabled: records.length === 0, onClick: () => downloadText('csdm-report.json', JSON.stringify({ summary, records }, null, 2), 'application/json'), key: 'json' }, 'JSON'),
-            h('button', { className: 'rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50', disabled: records.length === 0, onClick: () => downloadText('csdm-report.md', generateMarkdownReport(records, summary), 'text/markdown'), key: 'md' }, 'Markdown'),
+      analysed ? h('section', { className: box + ' p-5', key: 'filters' }, [
+        h('h2', { className: 'text-lg font-semibold', key: 't' }, '3. Explore and filter'),
+        h('div', { className: 'mt-4 grid gap-3 md:grid-cols-4', key: 'controls' }, [
+          h('div', { key: 'env' }, [h(Label, {}, 'Environment'),
+            h('select', { className: selectStyle, value: environment, onChange: (e: Event) => setEnvironment((e.target as HTMLSelectElement).value) }, options(envOptions))]),
+          h('div', { key: 'crit' }, [h(Label, {}, 'Criticality'),
+            h('select', { className: selectStyle, value: criticality, onChange: (e: Event) => setCriticality((e.target as HTMLSelectElement).value) }, options(critOptions))]),
+          h('div', { className: 'md:col-span-2', key: 'search' }, [h(Label, {}, 'Find applications, offerings or owners'),
+            h('input', { className: selectStyle, type: 'search', placeholder: 'Search across available fields', value: search,
+              onChange: (e: Event) => setSearch((e.target as HTMLInputElement).value) })]),
+        ]),
+        h('div', { className: 'mt-4 flex flex-wrap gap-2', key: 'views' },
+          allViews.map((v) => h('button', { className: view === v.value ? primary : button, key: v.value,
+            onClick: () => { setView(v.value); setSelectedNode(null); } }, v.label))),
+        h('p', { className: 'mt-3 text-xs text-slate-500', key: 'n' },
+          'Showing ' + filtered.length + ' of ' + records.length + ' rows. Filtering affects the diagram, findings table and record preview; overall score remains based on the full upload.'),
+      ]) : null,
+      analysed ? h('section', { className: box + ' overflow-hidden', key: 'graph' }, [
+        h('div', { className: 'flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4', key: 'head' }, [
+          h('div', { key: 'texts' }, [
+            h('h2', { className: 'text-xl font-semibold', key: 'title' }, 'Relationship explorer'),
+            h('p', { className: 'mt-1 text-xs text-slate-500', key: 'help' },
+              'Blue lines are CMDB relationships; dashed grey lines are parent references. Click a node to inspect its identity.'),
+          ]),
+          h('button', { className: button, disabled: !graph.nodes.length, onClick: () => pngExport(graph, version, view, setError), key: 'png' }, 'Export PNG'),
+        ]),
+        graph.truncated ? h('p', { className: 'border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900', key: 'limit' },
+          'Diagram limited to the first 120 unique nodes (' + graph.totalNodes + ' in the current filter). Narrow the filters to inspect other entities.') : null,
+        h('div', { className: 'h-[540px] bg-slate-50', key: 'canvas' },
+          h(FlowCanvas, { nodes: flowNodes, edges: flowEdges, nodeTypes: NODE_TYPES, fitView: true, minZoom: 0.12,
+            onNodeClick: (_event: unknown, node: { id: string; data: { kind: EntityKind; fullLabel: string } }) =>
+              setSelectedNode({ id: node.id, kind: node.data.kind, label: node.data.fullLabel }) }, [
+              h(Background, { key: 'background' }), h(Controls, { key: 'controls' }), h(MiniMap, { key: 'map' }),
+            ])),
+        selectedNode ? h('div', { className: 'border-t border-slate-200 bg-sky-50 px-5 py-3 text-sm', key: 'detail' }, [
+          h('strong', { key: 'title' }, LABELS[version][selectedNode.kind] + ': '),
+          h('span', { key: 'name' }, selectedNode.label),
+          h('span', { className: 'ml-3 break-all text-xs text-slate-500', key: 'id' }, selectedNode.id),
+        ]) : null,
+      ]) : null,
+      analysed ? h('section', { className: box + ' overflow-hidden', key: 'issues' }, [
+        h('div', { className: 'flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4', key: 'head' }, [
+          h('div', { key: 'texts' }, [
+            h('h2', { className: 'text-xl font-semibold', key: 'title' }, '4. Remediation register'),
+            h('p', { className: 'mt-1 text-xs text-slate-500', key: 'sub' }, 'Issue-level evidence and suggested remediation. Status changes remain in memory until exported.'),
+          ]),
+          h('div', { className: 'flex flex-wrap gap-2', key: 'exports' }, [
+            h('button', { className: button, onClick: () => exportText('csdm-v2-remediation.csv',
+              remediationCsv(findings), 'text/csv'), key: 'csv' }, 'Export remediation CSV'),
+            h('button', { className: button, onClick: () => exportText('csdm-v2-assessment.json',
+              JSON.stringify({ version, summary: { ...result, findings: undefined }, findings, records }, null, 2),
+              'application/json'), key: 'json' }, 'Export JSON'),
+            h('button', { className: button, onClick: () => exportText('csdm-v2-report.md',
+              reportMarkdown({ ...result, findings }, version), 'text/markdown'), key: 'md' }, 'Export Markdown'),
           ]),
         ]),
-      ]),
-      hasAnalysisRun ? h(PriorityIssuesPanel, { issues: priorityIssues, key: 'prioritypanel' }) : null,
-      h('div', { className: 'mt-8 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm', key: 'diagramwrap' }, [
-        h('div', { className: 'mb-4 flex items-center justify-between', key: 'heading' }, [
-          h('div', { key: 'copy' }, [
-            h('h2', { className: 'text-xl font-semibold text-navy', key: 'title' }, 'CSDM relationship diagram'),
-            h('p', { className: 'text-sm text-slate-500', key: 'desc' }, 'Business Application → Service Instance → Technical Management Service → Technical Service Offering'),
-          ]),
+        visibleFindings.length === 0
+          ? h('p', { className: 'px-5 py-6 text-sm text-slate-600', key: 'empty' }, 'No validation findings in the current filter.')
+          : h('div', { className: 'max-h-[440px] overflow-auto', key: 'scroll' },
+            h('table', { className: 'min-w-full divide-y divide-slate-200 text-left text-sm', key: 'table' }, [
+              h('thead', { className: 'sticky top-0 bg-slate-100 text-xs uppercase text-slate-600', key: 'thead' },
+                h('tr', {}, ['Row', 'Finding', 'Severity', 'Entity', 'Recommendation', 'Status'].map((name) =>
+                  h('th', { className: 'whitespace-nowrap px-4 py-3', key: name }, name)))),
+              h('tbody', { className: 'divide-y divide-slate-100', key: 'body' },
+                visibleFindings.map((f) => h('tr', { key: f.id }, [
+                  h('td', { className: 'px-4 py-3 text-slate-500', key: 'row' }, f.row),
+                  h('td', { className: 'min-w-[180px] px-4 py-3 font-medium', key: 'code' }, format(f.code)),
+                  h('td', { className: 'px-4 py-3', key: 'severity' },
+                    h('span', { className: chip + ' ' + severityStyle[f.severity] }, f.severity)),
+                  h('td', { className: 'max-w-[180px] break-words px-4 py-3', key: 'entity' }, f.entity),
+                  h('td', { className: 'min-w-[280px] px-4 py-3 text-slate-600', key: 'action' }, f.recommendation),
+                  h('td', { className: 'px-4 py-3', key: 'status' },
+                    h('select', { className: selectStyle, 'aria-label': 'Status for ' + f.code + ' row ' + f.row,
+                      value: f.status, onChange: (e: Event) => setStatuses({ ...statuses,
+                        [f.id]: (e.target as HTMLSelectElement).value as Finding['status'] }) },
+                    ['Open', 'In progress', 'Resolved'].map((s) => h('option', { key: s, value: s }, s)))),
+                ]))),
+            ])),
+      ]) : null,
+      analysed ? h('section', { className: box + ' overflow-hidden', key: 'table' }, [
+        h('div', { className: 'border-b border-slate-200 px-5 py-4', key: 'heading' }, [
+          h('h2', { className: 'text-xl font-semibold', key: 'title' }, '5. Parsed record preview'),
+          h('p', { className: 'mt-1 text-xs text-slate-500', key: 'desc' }, 'Showing the first 100 matching rows. Exported JSON contains all analysed records.'),
         ]),
-        h('div', { className: 'h-[520px] rounded-xl border border-slate-200 bg-slate-50', key: 'flow' },
-          h(FlowCanvas, { nodes: diagram.nodes, edges: diagram.edges, fitView: true }, [h(Background, { key: 'bg' }), h(Controls, { key: 'controls' }), h(MiniMap, { key: 'map' })])),
-      ]),
-      h('div', { className: 'mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm', key: 'tablewrap' }, [
-        h('div', { className: 'border-b border-slate-200 px-4 py-4', key: 'tablehead' }, [
-          h('h2', { className: 'text-xl font-semibold text-navy', key: 'title' }, 'Parsed CSV records'),
-          h('p', { className: 'text-sm text-slate-500', key: 'desc' }, hasAnalysisRun ? 'Validated browser-side only. No backend, database or authentication is used.' : 'Run analysis after selecting a CSV to populate parsed records.'),
-        ]),
-        h('div', { className: 'overflow-x-auto', key: 'scroll' },
-          records.length === 0 ? h('div', { className: 'px-4 py-8 text-sm font-medium text-slate-500', key: 'empty' }, 'No parsed CSV records yet.') : h('table', { className: 'min-w-full divide-y divide-slate-200 text-sm', key: 'table' }, [
-            h('thead', { className: 'bg-slate-50', key: 'head' }, h('tr', {}, REQUIRED_COLUMNS.map((column) => h('th', { className: 'whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700', key: column }, column.replace(/_/g, ' '))))),
-            h('tbody', { className: 'divide-y divide-slate-100 bg-white', key: 'body' }, records.map((record: CsdmRecord, index: number) => h('tr', { key: index, className: rowIsValid(record) ? '' : 'bg-amber-50' }, REQUIRED_COLUMNS.map((column) => h('td', { className: 'whitespace-nowrap px-4 py-3 text-slate-700', key: column }, record[column] || h('span', { className: 'font-semibold text-amber-700' }, 'Missing'))))))
-          ])),
-      ]),
+        h('div', { className: 'max-h-[400px] overflow-auto', key: 'scroll' }, h('table', {
+          className: 'min-w-full divide-y divide-slate-200 text-left text-xs',
+        }, [
+          h('thead', { className: 'sticky top-0 bg-slate-100', key: 'thead' },
+            h('tr', {}, columns.map((column) => h('th', { className: 'whitespace-nowrap px-3 py-3', key: column },
+              column in LABELS[version] ? LABELS[version][column as EntityKind] : format(column))))),
+          h('tbody', { className: 'divide-y divide-slate-100', key: 'tbody' },
+            filtered.slice(0, 100).map((record: CsdmRecord, index: number) =>
+              h('tr', { key: index, className: CORE_FIELDS.every((field) => normal(record[field])) ? '' : 'bg-amber-50' },
+                columns.map((column) => h('td', { className: 'whitespace-nowrap px-3 py-3 text-slate-700', key: column },
+                  record[column] || '—'))))),
+        ])),
+      ]) : null,
     ]),
-    h('footer', { className: 'border-t border-slate-200 bg-white px-6 py-6 text-center text-sm text-slate-500', key: 'footer' }, [
-      'CSDM Service Model Visualizer · Built by Enamul Haque · ',
-      h('a', {
-        href: 'https://www.linkedin.com/in/haquenam/',
-        target: '_blank',
-        rel: 'noopener noreferrer',
-        className: 'font-medium text-blue-700 underline-offset-4 hover:text-blue-800 hover:underline',
-        key: 'linkedin',
-      }, 'LinkedIn'),
+    h('footer', { className: 'border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500', key: 'footer' }, [
+      'CSDM Visualizer v2.0 · Built by Enamul Haque · Independent educational tool · ',
+      h('a', { href: 'https://github.com/haquenam/csdm-service-model-visualizer',
+        target: '_blank', rel: 'noopener noreferrer', className: 'text-blue-700 underline', key: 'github' }, 'GitHub'),
     ]),
   ]);
 };
-
 ReactDOM.createRoot(document.getElementById('root')).render(h(App));
