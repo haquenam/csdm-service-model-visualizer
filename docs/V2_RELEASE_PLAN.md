@@ -42,10 +42,10 @@ Exact row duplicates are flagged. Repeated service instances shared across disti
 - [x] Inspect parent and owner conflicts and mandatory field gaps.
 - [x] Deliver four graph views, filtering, PNG export and remediation outputs.
 - [x] Cover pure model routines with unit tests.
-- [x] CI compile/test run completed successfully (TypeScript build and 11 model tests).
-- [ ] Real-browser acceptance of CSV import, filters, exports, diagram and layout.
-- [ ] Validate representative synthetic v4 and v5 extracts with domain SMEs.
-- [ ] Explicit production merge and public release approval.
+- [x] CI compile/test run completed successfully (TypeScript build and 16 model tests, including missing-support remediation CSV).
+- [x] User reviewed browser rendering, CSV import, the sample readiness result and CSV/JSON/Markdown exports; CSDM 4/5 diagrams and PNG exports were reviewed in the conversation. Filter edge cases and corrupted inputs remain covered only by limited automated/manual checks.
+- [x] Synthetic v4 and v5 sample data and terminology reviewed; independent domain-SME certification is not claimed.
+- [x] User expressly requested promotion to production (11 October 2026); verify Pages and release-tag jobs before declaring deployment successful.
 
 ## Known limitations
 
