@@ -10,7 +10,7 @@ test('CSDM 4/5 labels and CMDB relationship types differ where required', () => 
   assert.equal(LABELS['4'].service_instance, 'Application Service');
   assert.equal(LABELS['5'].service_instance, 'Service Instance');
   assert.equal(LABELS['4'].technology_management_offering, 'Technical Service Offering');
-  assert.equal(LABELS['5'].technology_management_offering, 'Technology Management Offering');
+  assert.equal(LABELS['5'].technology_management_offering, 'Technology Management Service Offering');
   assert.equal(relationships('4')[0].name, 'Consumes::Consumed by');
   assert.equal(relationships('5')[0].name, 'Uses::Used by');
   assert.equal(relationships('5')[1].relationType, 'Reference');
@@ -49,8 +49,8 @@ test('repeated service instance in distinct relationships is not a duplicate', (
   assert.equal(result.duplicates, 0);
   assert.equal(result.counts.High, 0);
   const graph = createGraph(rows, '5', 'all');
-  assert.equal(graph.edges.filter((e) => e.label === 'Uses::Used by').length, 3);
-  assert.equal(graph.edges.filter((e) => e.label === 'Contains::Contained by').length, 2);
+  assert.equal(graph.edges.filter((e) => e.label === 'Uses::Used by').length, 2);
+  assert.equal(graph.edges.filter((e) => e.label === 'Contains::Contained by').length, 3);
 });
 
 test('identical row and conflicting reference parents are reported individually', () => {
@@ -93,7 +93,7 @@ test('CSV escapes quotes, newlines and spreadsheet formula prefixes', () => {
   const csv = remediationCsv([{ id: '1', code: 'missing_owner', severity: 'Low', row: 2,
     entity: '=BAD', currentValue: '', recommendation: 'Investigate', status: 'Open' }]);
   assert.ok(csv.includes("'=BAD"));
-  assert.ok(toCsv(standardSample(), '5').includes('technology_management_offering'));
+  assert.ok(toCsv(standardSample(), '5').includes('technology_management_service_offering'));
 });
 
 test('diagram limits are explicit and filtered views contain only relevant nodes', () => {
@@ -104,7 +104,7 @@ test('diagram limits are explicit and filtered views contain only relevant nodes
   const full = createGraph(rows, '5', 'all', 50);
   assert.equal(full.truncated, true);
   assert.equal(full.nodes.length, 50);
-  const subset = createGraph(rows.slice(0, 2), '5', 'application');
+  const subset = createGraph([rows[0], rows[2]], '5', 'application');
   assert.equal(subset.nodes.length, 4);
   assert.ok(subset.nodes.every((n) => ['business_application', 'service_instance'].includes(n.kind)));
 });
@@ -140,7 +140,9 @@ test('PNG separates consumer relationships from technical offering relationships
 });
 
 test('PNG application edges use distinct lanes when sharing a narrow column gutter', () => {
-  const source = createGraph(standardSample(), '5', 'all');
+  const third = { ...standardSample()[2], business_application: 'Third App',
+    service_instance: 'Third Instance' };
+  const source = createGraph([...standardSample(), third], '5', 'all');
   const { graph } = preparePngGraph(source, 'all');
   const routes = calculatePngRoutes(graph);
   const appEdges = graph.edges.filter((edge) => edge.label === 'Uses::Used by');
@@ -163,7 +165,8 @@ test('consumer-only PNG view does not repeat instances unnecessarily', () => {
 });
 
 test('remediation export includes a Medium severity finding for a missing support group', () => {
-  const incomplete = { ...standardSample()[0], support_group: '' };
+  const incomplete = { ...standardSample()[0], support_group: '',
+    technology_management_offering_support_group: '' };
   const analysis = analyse([incomplete], '5');
   const finding = analysis.findings.find((item) => item.code === 'missing_support_group');
   assert.ok(finding, 'missing support group produces a finding');
