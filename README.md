@@ -1,84 +1,81 @@
-# CSDM Service Model Visualizer v2.0
+# CSDM Service Model Visualizer
 
-**An independent, browser-based CSDM architecture and data quality workbench.** Designed for architectural exploration, education and governance conversations. Created by Enamul Haque.
+**An independent, open-source CSDM architecture and data quality workbench** for ServiceNow architects, enterprise architects and governance teams. Created by Enamul Haque.
 
+**Current release: v2.1.0**  
 **Live application:** https://haquenam.github.io/csdm-service-model-visualizer/  
-**Release notes:** [v2.0.0](docs/RELEASE_NOTES_2.0.md)  
-**Detailed model contract:** [Version 2 model and acceptance notes](docs/V2_RELEASE_PLAN.md)
+**What's changed:** [v2.1.0 release notes](docs/RELEASE_NOTES_2.1.md)  
+**Prepare a CSV:** [ServiceNow import preparation guide](docs/IMPORT_PREPARATION.md)  
+**Relationship contract:** [v2 model notes](docs/V2_RELEASE_PLAN.md)
 
-## What's new in v2.0
+## What you can do
 
-- Choose **CSDM 4** or **CSDM 5**. Labels, sample CSV headers and specified relationship semantics adjust to the selected version.
-- Inspect **Application**, **Service Delivery**, **Service Consumption** or **End-to-end** graph perspectives.
-- Inspect relationships by type: CMDB CI relationships (blue) and service/offerings parent references (grey dashed).
-- Analyse a custom structured CSV with optional per-entity `sys_id` identifiers, legacy v1 header aliases and CSDM 4/5 naming variants.
-- Detect missing core mappings, missing application owners/support groups, exact duplicate input rows, ambiguous identities, conflicting parents and owner conflicts.
-- Filter by environment, criticality and search text. Review all findings and edit in-session remediation statuses.
-- Download **remediation CSV**, **JSON**, **Markdown** and a labelled **PNG** architecture diagram.
-- Exported end-to-end PNGs put Business Service consumption relationships in a separate labelled section, repeating referenced Service Instances *visually*, not creating new CIs.
-- Run strict TypeScript compilation and automated regression tests through GitHub Actions.
+- Select **CSDM 4** or **CSDM 5** and use the appropriate terminology, templates and relationship labels.
+- Choose **Uses::Used by** or **Consumes::Consumed by** for the CSDM 5 Business Application–Service Instance relationship; CSDM 4 uses Consumes. Some ServiceNow product areas have different relationship conventions.
+- Inspect four model perspectives: **End-to-end**, **Application**, **Service Delivery** and **Service Consumption**.
+- Check relationships between Business Applications, Application Services/Service Instances, Technical/Technology Management Services and Offerings, plus optional Business Services and Business Service Offerings.
+- Validate incomplete core mappings, ownership and support gaps, conflicting records, questionable Business Application–Service Instance associations and exact duplicate rows.
+- Filter by environment, criticality and free text. Inspect an interactive graph with clearly distinguished CMDB relationships and parent references.
+- Download the architecture diagram as PNG or export remediation CSV, JSON and Markdown.
+- **Save Assessment / Resume Assessment**: preserve the analysed records, model version, relationship mode and remediation statuses in a downloadable local JSON file.
 
-## How to use
+The Visualizer is a reference and review aid, **not a ServiceNow-certified CSDM assessment**.
 
-1. Select **CSDM 4** or **CSDM 5**.
-2. Click **Download v4 template** or **Download v5 template** for safe synthetic sample data, or prepare a compatible structured CSV.
-3. Choose the CSV. The file is processed **only after** clicking **Run analysis**.
-4. Review the advisory readiness indicator, record completeness and prioritised findings.
-5. Use the filters and four graph views to inspect different relationships.
-6. Export a PNG or download remediation CSV, JSON and Markdown reports. Download the remediation CSV before leaving the page if you have changed statuses.
+## Quick start
 
-The sample includes a Service Instance used by two different Business Applications. This is a legitimate repeated entity reference, not a duplicate input row.
+1. Select CSDM 4 or CSDM 5. If using CSDM 5, select the applicable relationship mode.
+2. Click **Download v4 template** or **Download v5 template**, or prepare a compatible CSV following the [import guide](docs/IMPORT_PREPARATION.md).
+3. Click **Choose CSV** and **Run analysis**.
+4. Review the findings and the relationship graph. Update remediation statuses if needed.
+5. Export reports or click **Save assessment** to retain progress. Later, use **Resume assessment** to reopen the saved JSON.
 
-## CSDM version mapping
+The tool works on a **single structured CSV representing relationship paths**, not direct ServiceNow API integration or automatic joins across multiple native table exports. You can repeat a Service Instance across different offering relationships without creating duplicate CIs or triggering an exact-row duplicate. A Service Instance associated with multiple Business Applications may, however, be reported as a modelling question for review.
 
-| Model concept | CSDM 4 | CSDM 5 |
+## CSDM 4 and 5 mapping
+
+| Concept | CSDM 4 display label | CSDM 5 display label |
 | --- | --- | --- |
-| Operational application instance | Application Service | Service Instance |
+| Operational instance | Application Service | Service Instance |
 | Technology service | Technical Service | Technology Management Service |
-| Technology offering | Technical Service Offering | Technology Management Offering |
-| Consumer-facing offering | Business Service Offering | Business Offering |
-| Business Application relationship (default for this tool) | Consumes::Consumed by | Uses::Used by |
+| Technology offering | Technical Service Offering | Technology Management Service Offering |
+| Consumer service | Business Service | Business Service |
+| Consumer offering | Business Service Offering | Business Service Offering |
+| Default Business Application relation | Consumes::Consumed by | Uses::Used by (configurable) |
 
-The graph distinguishes **CMDB relationships** from **parent references**. The CSDM 5 Business Application relationship can have documented Enterprise Architecture Workspace exceptions; the version selector is **not** a platform migration or an assertion of complete CSDM compliance.
+The CSDM 5 compatibility selector also permits Consumes::Consumed by when appropriate for particular ServiceNow capabilities, such as some Enterprise Architecture Workspace scenarios. **Changing this setting does not update a ServiceNow instance.**
 
-## Input contract
+## Preparing input data
 
-The versioned template has four core entity fields:
+Version 5 templates use:
 
 - `business_application`
-- `application_service` (CSDM 4) or `service_instance` (CSDM 5)
-- `technical_service` (CSDM 4) or `technology_management_service` (CSDM 5)
-- `technical_service_offering` (CSDM 4) or `technology_management_offering` (CSDM 5)
+- `service_instance`
+- `technology_management_service`
+- `technology_management_service_offering`
 
-Optional relationship fields: Business Service and Business Offering / Business Service Offering. Other fields describe application owner, service owner, support group, environment, criticality and optional per-entity `sys_id` values.
+Version 4 templates use `business_application`, `application_service`, `technical_service` and `technical_service_offering`.
 
-The original v1 columns `technical_management_service` and `technical_service_offering` remain accepted as aliases. The parser can interpret compatible flat CSV headers. It **does not** automatically join several native ServiceNow list exports or load CMDB relation tables.
+Additional optional columns represent Business Service and Business Service Offering, environment and criticality, object-specific owner/support attributes, and entity `sys_id` identifiers. The old `support_group` column remains an **offering-level fallback**; it does not establish the Service Instance support group. Existing v1 and v2.0 headers such as `technology_management_offering`, `business_offering` and `technical_management_service` are recognised as input aliases.
 
-## Validation and readiness
+See [Preparing CSDM data for the Visualizer](docs/IMPORT_PREPARATION.md) for the complete template contract and preparation guidance.
 
-The indicator is based on evidence from the uploaded rows, *not* a ServiceNow-certified CSDM maturity assessment. Weighted penalties use **High = 8, Medium = 4, Low = 2**, divided by a maximum of four high-weight findings per input row; the score is floored at zero. Missing optional consumer-domain objects are not automatically defects.
+## Advisory readiness score
 
-Duplicate logic distinguishes **exactly repeated rows** from valid repeated entity references. When stable `sys_id` fields are supplied, identity conflicts and name ambiguity receive separate findings.
+```text
+Score = max(0, round(100 - 100 * (8*H + 4*M + 2*L) / (32*N)))
+```
 
-## Security and data safety
+Here H, M and L are counts of High, Medium and Low findings, and N is the number of imported rows. A three-row extract with one Medium finding scores approximately **96%**. The model is intentionally simple and depends on what was included in the imported extract; it is not a certification or authoritative CMDB quality metric.
 
-CSV processing takes place inside your browser without a backend, authentication, database or ServiceNow API connection. The project does not intentionally transmit uploaded data to GitHub or any server. Browser resources are served from public CDNs.
+## Privacy and dependency security
 
-**Use only synthetic or suitably anonymised data. Do not use client, production, confidential, personal, regulated or sensitive records.** Exported reports are saved locally, and remediation-status edits are not persisted after the session.
+The release performs analysis within the browser and has **no application backend, database or ServiceNow API connection**. The JavaScript and CSS dependencies are bundled locally with the deployed site; the application does not need third-party runtime library CDNs.
 
-This is an independent educational tool, not an official ServiceNow product and not affiliated with, endorsed by or sponsored by ServiceNow. Do not use its outputs as production import approval, CMDB certification or regulatory evidence.
-
-## Scale and known boundaries
-
-- A single structured flat CSV is supported; native multi-file ServiceNow imports and live integration are out of scope.
-- The interactive diagram shows at most **120 unique nodes** and signals when it is truncated. Filter the dataset to inspect other entities.
-- PNG exports reflect the selected view and visible graph. Large diagrams may need narrower filtering.
-- Remediation statuses remain in the current browser session until exported.
-- CSDM terminology/relationships are supported for the documented subset only. Additional domains and platform-specific conventions require qualified architecture review.
+**Use synthetic or suitably anonymised data only. Do not upload production, customer, confidential, regulated or personal data.** Assessment sessions and reports are written locally to the user's device; statuses are not automatically preserved unless an assessment session is saved.
 
 ## Development
 
-Requirements: Node.js 22 and npm.
+Node.js 22 and npm are recommended.
 
 ```bash
 git clone https://github.com/haquenam/csdm-service-model-visualizer.git
@@ -88,31 +85,32 @@ npm test
 npm run dev
 ```
 
-`npm test` compiles TypeScript and runs the Node.js model tests. `npm run dev` serves the built static site (its port is shown by the running server).
+`npm test` compiles the model, bundles the browser application and runs the regression tests. `npm run dev` builds the static site and starts a local preview server. GitHub Pages deployments are built by GitHub Actions from `main`.
 
-| Layer | Implementation |
+| Component | Implementation |
 | --- | --- |
-| Client | React, TypeScript, JavaScript |
-| Diagram | React Flow |
-| CSV import | PapaParse |
+| Client | TypeScript and React |
+| Relationship graphs | React Flow |
+| CSV parsing | PapaParse |
 | Styling | Tailwind CSS |
-| Hosting | GitHub Pages via GitHub Actions |
+| Build | TypeScript, esbuild, Tailwind CLI |
+| Hosting | GitHub Pages |
 | Backend | None |
 
 ## Roadmap
 
-| Delivery | Status |
-| --- | --- |
-| v1.1: validation severity and recommendations | Completed |
-| v1.2: CSV template guidance | Completed |
-| v2.0: CSDM 4/5 views, model validation and remediation workbench | Released |
-| Native multi-table ServiceNow adapters | Future |
-| Hierarchical grouping for large graph datasets | Future |
-| Persistent collaboration, AI recommendations and scoped ServiceNow app | Future |
+| Version | Scope | Status |
+| --- | --- | --- |
+| v1.1 | Severity-based validation and recommendations | Released |
+| v1.2 | CSV templates and field guidance | Released |
+| v2.0 | CSDM 4/5 modelling, multiple views, remediation and PNG export | Released |
+| v2.1 | Object-specific governance, model integrity, relationship compatibility, save/resume, local libraries | Released |
+| v2.2 (proposed) | Native multi-table ServiceNow list-export adapters and joined relationship records | Future |
+| Later | Larger graph navigation, governed persistent remediation and optional AI assistance | Future |
 
-## Licence
+## Licence and attribution
 
-MIT. See [LICENSE](LICENSE).
+MIT licensed. See [LICENSE](LICENSE). Independent educational tool, not affiliated with, sponsored by or endorsed by ServiceNow.
 
 **Author:** Enamul Haque  
-[LinkedIn](https://www.linkedin.com/in/haquenam/) · [GitHub](https://github.com/haquenam)
+[GitHub](https://github.com/haquenam)

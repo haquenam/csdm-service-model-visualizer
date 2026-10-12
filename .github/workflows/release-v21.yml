@@ -1,0 +1,42 @@
+name: Publish CSDM v2.1 Release
+
+on:
+  workflow_run:
+    workflows: ["Build and Deploy GitHub Pages"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Only publish a release for the exact commit successfully deployed from main.
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout deployed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: Publish v2.1.0 after successful GitHub Pages deployment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ "$(node -p "require('./package.json').version")" != "2.1.0" ]; then
+            echo "The deployed commit is not version 2.1.0. Skipping release."
+            exit 0
+          fi
+          if gh release view v2.1.0 >/dev/null 2>&1; then
+            echo "Release v2.1.0 already exists."
+            exit 0
+          fi
+          gh release create v2.1.0 \
+            --target "$TARGET_SHA" \
+            --title "CSDM Visualizer v2.1.0 - Model Integrity and Assessment Continuity" \
+            --notes-file docs/RELEASE_NOTES_2.1.md \
+            --latest

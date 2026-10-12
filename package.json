@@ -1,15 +1,27 @@
 {
   "name": "csdm-service-model-visualizer",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "scripts": {
-    "dev": "npm run build && npx serve dist",
+    "dev": "npm run build && serve dist",
     "build": "node scripts/build.mjs",
-    "preview": "npx serve dist",
+    "preview": "serve dist",
     "test": "npm run build && node --test tests/*.test.mjs"
   },
   "devDependencies": {
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "esbuild": "0.25.10",
+    "tailwindcss": "3.4.17",
+    "serve": "14.2.4",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@types/papaparse": "5.3.15"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "reactflow": "11.11.4",
+    "papaparse": "5.4.1"
   }
 }
