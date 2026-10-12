@@ -398,11 +398,15 @@ const App = () => {
                   className: 'rounded bg-white px-2 py-1 text-xs text-slate-700', key: name }, name))),
               h('p', { className: 'mt-3 text-xs leading-5 text-slate-600', key: 'note' },
                 'The four core entity fields determine row completeness. Objects can have distinct support and ownership. Legacy support_group maps to the offering only. Version-specific aliases and optional sys_id columns are supported.'),
+              h('a', { href: 'https://github.com/haquenam/csdm-service-model-visualizer/blob/release/v2.1.0/docs/IMPORT_PREPARATION.md',
+                target: '_blank', rel: 'noopener noreferrer', key: 'mapping',
+                className: 'mt-3 inline-block text-xs font-semibold text-blue-700 underline' },
+                'Preparing ServiceNow exports and mapping fields'),
             ]),
           ]),
         ]),
         h('div', { className: 'border-t border-amber-200 bg-amber-50 px-6 py-3 text-xs leading-5 text-amber-900', key: 'privacy' },
-          'Analysis runs in your browser. This development build still loads libraries from public CDNs. Use synthetic or suitably anonymised data; do not upload confidential or personal records.'),
+          'Analysis runs in your browser with locally bundled libraries and no backend. Use synthetic or suitably anonymised data; do not upload confidential, personal or production records.'),
       ]),
       error ? h('div', { className: 'rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800', role: 'alert', key: 'error' }, error) : null,
       h('section', { key: 'summary' }, [
@@ -464,7 +468,7 @@ const App = () => {
         h('div', { className: 'flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4', key: 'head' }, [
           h('div', { key: 'texts' }, [
             h('h2', { className: 'text-xl font-semibold', key: 'title' }, '4. Remediation register'),
-            h('p', { className: 'mt-1 text-xs text-slate-500', key: 'sub' }, 'Issue-level evidence and suggested remediation. Status changes remain in memory until exported.'),
+            h('p', { className: 'mt-1 text-xs text-slate-500', key: 'sub' }, 'Issue-level evidence and suggested remediation. Use Save assessment above to retain statuses and resume later.'),
           ]),
           h('div', { className: 'flex flex-wrap gap-2', key: 'exports' }, [
             h('button', { className: button, onClick: () => exportText('csdm-v2-remediation.csv',
