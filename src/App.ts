@@ -131,19 +131,35 @@ const pngExport = (sourceGraph: Graph, version: CsdmVersion, view: ModelView,
   });
   graph.nodes.forEach((node) => {
     addRect(node.x + 10, node.y + 2, 236, 70, node.kind === 'service_instance' ? '#e0f2fe' : '#f8fafc', '#94a3b8');
+    // Break long formal CSDM 5 service offering names across two lines
+    // instead of letting an unbroken heading overlap the next relationship.
+    const headingWords = LABELS[version][node.kind].split(' ');
+    const headingLines: string[] = [];
+    let current = '';
+    headingWords.forEach((word) => {
+      if (current && (current + ' ' + word).length > 29) {
+        headingLines.push(current);
+        current = word;
+      } else current = current ? current + ' ' + word : word;
+    });
+    if (current) headingLines.push(current);
     const text = svgElement('text');
     text.setAttribute('x', String(node.x + 20));
-    text.setAttribute('y', String(node.y + 24));
+    text.setAttribute('y', String(node.y + (headingLines.length > 1 ? 18 : 24)));
     text.setAttribute('fill', '#0f2544');
     text.setAttribute('font-family', 'Arial, sans-serif');
-    text.setAttribute('font-size', '12');
-    const label = svgElement('tspan');
-    label.setAttribute('font-weight', 'bold');
-    label.textContent = LABELS[version][node.kind];
-    text.appendChild(label);
+    text.setAttribute('font-size', headingLines.length > 1 ? '11' : '12');
+    headingLines.forEach((headingLine, index) => {
+      const line = svgElement('tspan');
+      line.setAttribute('x', String(node.x + 20));
+      if (index > 0) line.setAttribute('dy', '14');
+      line.setAttribute('font-weight', 'bold');
+      line.textContent = headingLine;
+      text.appendChild(line);
+    });
     const value = svgElement('tspan');
     value.setAttribute('x', String(node.x + 20));
-    value.setAttribute('dy', '22');
+    value.setAttribute('dy', headingLines.length > 1 ? '19' : '22');
     value.textContent = node.label.length > 30 ? node.label.slice(0, 29) + '…' : node.label;
     text.appendChild(value);
     svg.appendChild(text);
@@ -213,6 +229,15 @@ const CsdmNode = ({ data }: { data: { kind: EntityKind; fullLabel: string; headi
   h('div', { className: 'mt-1 break-words text-xs font-semibold text-slate-900', key: 'name' }, data.fullLabel),
 ]);
 const NODE_TYPES = { csdm: CsdmNode };
+// Keep compact captions in the interactive diagram: full ServiceNow relation
+// labels are preserved in the edge accessibility label and the data model.
+const shortRelationLabel = (label: string): string =>
+  label.startsWith('Consumes::') ? 'Consumes' :
+    label.startsWith('Uses::') ? 'Uses' :
+      label.startsWith('Contains::') ? 'Contains' :
+        label.startsWith('Depends on::') ? 'Depends on' :
+          label.includes('(reference)') ? 'Parent' : label;
+
 const App = () => {
   const [version, setVersion] = useState('5') as [CsdmVersion, (value: CsdmVersion) => void];
   const [relationshipMode, setRelationshipMode] = useState('uses') as [RelationshipMode, (value: RelationshipMode) => void];
@@ -250,7 +275,9 @@ const App = () => {
     return graph.edges.map((e: Graph['edges'][number]) => {
       const toRight = (positions.get(e.source) ?? 0) < (positions.get(e.target) ?? 0);
       return {
-        id: e.id, source: e.source, target: e.target, label: e.label,
+        id: e.id, source: e.source, target: e.target,
+        label: shortRelationLabel(e.label),
+        ariaLabel: e.label, data: { fullRelation: e.label },
         sourceHandle: toRight ? 'source-right' : 'source-left',
         targetHandle: toRight ? 'target-left' : 'target-right',
         type: 'smoothstep', pathOptions: { borderRadius: 12, offset: 18 },
@@ -446,7 +473,7 @@ const App = () => {
           h('div', { key: 'texts' }, [
             h('h2', { className: 'text-xl font-semibold', key: 'title' }, 'Relationship explorer'),
             h('p', { className: 'mt-1 text-xs text-slate-500', key: 'help' },
-              'Blue lines are CMDB relationships; dashed grey lines are parent references. Click a node to inspect its identity.'),
+              'Blue lines show CMDB relationships; dashed grey lines show parent references. Edge captions are shortened for readability. Click a node to inspect it.'),
           ]),
           h('button', { className: button, disabled: !graph.nodes.length, onClick: () => pngExport(graph, version, view, setError), key: 'png' }, 'Export PNG'),
         ]),
