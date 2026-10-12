@@ -1,9 +1,10 @@
 import {
-  type CsdmVersion, type ModelView, type CsdmRecord, type Finding, type Graph, type EntityKind,
+  type CsdmVersion, type ModelView, type RelationshipMode, type CsdmRecord, type Finding, type Graph, type EntityKind,
   FIELDS, CORE_FIELDS, ENTITY_FIELDS, LABELS, expectedHeaders, standardSample, toCsv,
   parseRows, analyse, createGraph, preparePngGraph, calculatePngRoutes,
   remediationCsv, reportMarkdown, normal,
 } from './model.js';
+import { buildSession, readSession, findingKey, MAX_SESSION_BYTES } from './session.js';
 declare const React: any;
 declare const ReactDOM: any;
 declare const Papa: any;
@@ -213,6 +214,7 @@ const CsdmNode = ({ data }: { data: { kind: EntityKind; fullLabel: string; headi
 const NODE_TYPES = { csdm: CsdmNode };
 const App = () => {
   const [version, setVersion] = useState('5') as [CsdmVersion, (value: CsdmVersion) => void];
+  const [relationshipMode, setRelationshipMode] = useState('uses') as [RelationshipMode, (value: RelationshipMode) => void];
   const [records, setRecords] = useState([]) as [CsdmRecord[], (value: CsdmRecord[]) => void];
   const [file, setFile] = useState(null) as [File | null, (value: File | null) => void];
   const [fileKey, setFileKey] = useState(0);
@@ -227,14 +229,16 @@ const App = () => {
     (value: { kind: EntityKind; id: string; label: string } | null) => void];
   const result = useMemo(() => analyse(records, version), [records, version]);
   const findings = useMemo(() => result.findings.map((f: Finding) => ({
-    ...f, status: statuses[f.id] || f.status,
+    ...f, status: statuses[findingKey(f)] || f.status,
   })), [result, statuses]) as Finding[];
   const filtered = useMemo(() => records.filter((record: CsdmRecord) =>
     (!environment || record.environment === environment) &&
     (!criticality || record.criticality === criticality) &&
     (!search || FIELDS.some((field) => record[field].toLowerCase().includes(search.toLowerCase())))),
   [records, environment, criticality, search]) as CsdmRecord[];
-  const graph = useMemo(() => createGraph(filtered, version, view), [filtered, version, view]);
+  const effectiveMode: RelationshipMode = version === '4' ? 'consumes' : relationshipMode;
+  const graph = useMemo(() => createGraph(filtered, version, view, 120, effectiveMode),
+    [filtered, version, view, effectiveMode]);
   const flowNodes = useMemo(() => graph.nodes.map((n: Graph['nodes'][number]) => ({
     id: n.id, type: 'csdm',
     data: { heading: LABELS[version][n.kind], kind: n.kind, fullLabel: n.label },
@@ -284,6 +288,32 @@ const App = () => {
     const chosen = (event.target as HTMLInputElement).files?.[0] || null;
     reset(); setFile(chosen);
   };
+  const resumeSession = async (event: Event) => {
+    const incoming = (event.target as HTMLInputElement).files?.[0];
+    (event.target as HTMLInputElement).value = '';
+    if (!incoming) return;
+    if (incoming.size > MAX_SESSION_BYTES) {
+      setError('Assessment exceeds the 5 MB safety limit.');
+      return;
+    }
+    try {
+      const loaded = readSession(await incoming.text());
+      setVersion(loaded.version);
+      setRelationshipMode(loaded.mode);
+      setRecords(loaded.records);
+      setStatuses(loaded.statuses);
+      setAnalysed(true);
+      setFile(null);
+      setFileKey((current: number) => current + 1);
+      setSelectedNode(null);
+      setEnvironment('');
+      setCriticality('');
+      setSearch('');
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to resume assessment.');
+    }
+  };
   const options = (values: string[]) => [
     h('option', { key: '', value: '' }, 'All'),
     ...values.map((v) => h('option', { key: v, value: v }, v)),
@@ -297,7 +327,7 @@ const App = () => {
     h('header', { className: 'border-b border-slate-800 bg-[#0f2544] text-white', key: 'hero' },
       h('div', { className: 'mx-auto max-w-7xl px-5 py-9 lg:px-8' }, [
         h('div', { className: 'flex flex-wrap items-center justify-between gap-3', key: 'eyebrow' }, [
-          h('p', { className: 'text-xs font-bold uppercase tracking-[.2em] text-sky-200', key: 'v' }, 'CSDM Visualizer / v2.0 workbench'),
+          h('p', { className: 'text-xs font-bold uppercase tracking-[.2em] text-sky-200', key: 'v' }, 'CSDM Visualizer / v2.1 development preview'),
           h('span', { className: chip + ' border-sky-700 bg-sky-900 text-sky-100', key: 'b' }, 'Browser-only · no backend'),
         ]),
         h('h1', { className: 'mt-4 text-3xl font-semibold tracking-tight sm:text-5xl', key: 'title' }, 'Service architecture, made inspectable.'),
@@ -317,12 +347,24 @@ const App = () => {
           h('div', { key: 'version' }, [
             h(Label, { key: 'label' }, 'CSDM model version'),
             h('select', { className: selectStyle, 'aria-label': 'CSDM version', value: version,
-              onChange: (event: Event) => setVersion((event.target as HTMLSelectElement).value as CsdmVersion), key: 'select' },
+              onChange: (event: Event) => { setVersion((event.target as HTMLSelectElement).value as CsdmVersion); setStatuses({}); }, key: 'select' },
               [h('option', { value: '4', key: '4' }, 'CSDM 4'),
                 h('option', { value: '5', key: '5' }, 'CSDM 5')]),
+            h('div', { className: 'mt-4', key: 'relationship' }, [
+              h(Label, { key: 'label' }, 'Business Application relationship'),
+              h('select', { className: selectStyle, value: effectiveMode, disabled: version === '4',
+                'aria-label': 'Business Application to Service Instance relationship',
+                onChange: (e: Event) => setRelationshipMode((e.target as HTMLSelectElement).value as RelationshipMode), key: 'selector' }, [
+                  h('option', { value: 'uses', key: 'uses' }, 'Uses::Used by'),
+                  h('option', { value: 'consumes', key: 'consumes' }, 'Consumes::Consumed by'),
+                ]),
+              h('p', { className: 'mt-2 text-xs leading-5 text-slate-600', key: 'tip' },
+                version === '4' ? 'CSDM 4 uses Consumes::Consumed by.' :
+                  'CSDM 5 guidance prefers Uses::Used by. Some ServiceNow products, including EA Workspace, still rely on Consumes::Consumed by.'),
+            ]),
             h('div', { className: 'mt-3 rounded-lg bg-slate-100 px-3 py-3 text-xs leading-5 text-slate-600', key: 'desc' },
               version === '5'
-                ? 'Uses Service Instance, Technology Management Service and Technology Management Offering.'
+                ? 'Uses Service Instance, Technology Management Service and Technology Management Service Offering.'
                 : 'Uses Application Service, Technical Service and Technical Service Offering.'),
           ]),
           h('div', { key: 'file' }, [
@@ -336,6 +378,14 @@ const App = () => {
                 toCsv(standardSample(), version), 'text/csv'), key: 'sample' }, 'Download v' + version + ' template'),
               h('button', { className: primary, disabled: !file, onClick: run, key: 'run' }, 'Run analysis'),
               h('button', { className: button, disabled: !file && !analysed, onClick: reset, key: 'clear' }, 'Clear'),
+              h('button', { className: button, disabled: !analysed,
+                onClick: () => exportText('csdm-v2.1-session.json',
+                  JSON.stringify(buildSession(version, effectiveMode, records, findings), null, 2),
+                  'application/json'), key: 'save-session' }, 'Save assessment'),
+              h('label', { className: button + ' cursor-pointer', htmlFor: 'session-file', key: 'resume' }, [
+                'Resume assessment', h('input', { id: 'session-file', type: 'file', accept: '.json,application/json',
+                  className: 'sr-only', onChange: resumeSession }),
+              ]),
             ]),
             h('p', { className: 'mt-3 text-sm text-slate-600', key: 'selected' }, file ? 'Selected: ' + file.name :
               'No file selected. You can also use the sample to explore the expected fields.'),
@@ -346,12 +396,12 @@ const App = () => {
                 expectedHeaders(version).map((name: string) => h('code', {
                   className: 'rounded bg-white px-2 py-1 text-xs text-slate-700', key: name }, name))),
               h('p', { className: 'mt-3 text-xs leading-5 text-slate-600', key: 'note' },
-                'The first four entity fields are assessed for core completeness. Optional object sys_id columns preserve identity. Legacy v1 CSV labels and CSDM 4/5 alternatives are recognised where unambiguous.'),
+                'The four core entity fields determine row completeness. Objects can have distinct support and ownership. Legacy support_group maps to the offering only. Version-specific aliases and optional sys_id columns are supported.'),
             ]),
           ]),
         ]),
         h('div', { className: 'border-t border-amber-200 bg-amber-50 px-6 py-3 text-xs leading-5 text-amber-900', key: 'privacy' },
-          'Local browser processing only. Use synthetic or suitably anonymised data. Do not upload client, production, confidential, regulated or personal data.'),
+          'Analysis runs in your browser. This development build still loads libraries from public CDNs. Use synthetic or suitably anonymised data; do not upload confidential or personal records.'),
       ]),
       error ? h('div', { className: 'rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800', role: 'alert', key: 'error' }, error) : null,
       h('section', { key: 'summary' }, [
@@ -367,7 +417,7 @@ const App = () => {
           h(Stat, { label: 'Exact duplicate rows', value: analysed ? result.duplicates : '—', key: 'duplicates' }),
         ]),
         h('p', { className: 'mt-3 text-xs leading-5 text-slate-500', key: 'math' },
-          'Score = 100 − weighted findings ÷ (32 × rows) × 100, floored at zero. High = 8, Medium = 4, Low = 2. Repeated service references are not duplicates.'),
+          'Score = max(0, round(100 − 100 × (8H + 4M + 2L) / (32N))). H, M and L are High/Medium/Low findings; N is imported rows. Example: 3 rows with 1 Medium finding = 96%. Advisory only.'),
       ]),
       analysed ? h('section', { className: box + ' p-5', key: 'filters' }, [
         h('h2', { className: 'text-lg font-semibold', key: 't' }, '3. Explore and filter'),
@@ -443,7 +493,7 @@ const App = () => {
                   h('td', { className: 'px-4 py-3', key: 'status' },
                     h('select', { className: selectStyle, 'aria-label': 'Status for ' + f.code + ' row ' + f.row,
                       value: f.status, onChange: (e: Event) => setStatuses({ ...statuses,
-                        [f.id]: (e.target as HTMLSelectElement).value as Finding['status'] }) },
+                        [findingKey(f)]: (e.target as HTMLSelectElement).value as Finding['status'] }) },
                     ['Open', 'In progress', 'Resolved'].map((s) => h('option', { key: s, value: s }, s)))),
                 ]))),
             ])),
@@ -468,7 +518,7 @@ const App = () => {
       ]) : null,
     ]),
     h('footer', { className: 'border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500', key: 'footer' }, [
-      'CSDM Visualizer v2.0 · Built by Enamul Haque · Independent educational tool · ',
+      'CSDM Visualizer v2.1 preview · Built by Enamul Haque · Independent educational tool · ',
       h('a', { href: 'https://github.com/haquenam/csdm-service-model-visualizer',
         target: '_blank', rel: 'noopener noreferrer', className: 'text-blue-700 underline', key: 'github' }, 'GitHub'),
     ]),
