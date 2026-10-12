@@ -173,6 +173,11 @@ const guidance: Record<string, { severity: Severity; action: string }> = {
   conflicting_parent: { severity: 'High', action: 'An offering maps to multiple parents; verify the offering parent reference.' },
   conflicting_owner: { severity: 'Medium', action: 'The same Business Application has different owners in the import; confirm the authoritative owner.' },
   ambiguous_name: { severity: 'Medium', action: 'The same displayed name has different sys_ids; inspect the distinct records, do not merge by name.' },
+  multiple_business_applications: { severity: 'Medium', action: 'A Service Instance is mapped to multiple Business Applications. Check the application identity and intended architecture.' },
+  missing_service_instance_support_group: { severity: 'Medium', action: 'Confirm the Service Instance support group; do not automatically copy the offering support group.' },
+  missing_technology_management_offering_support_group: { severity: 'Medium', action: 'Assign the offering-specific support group, or map a legacy generic support group.' },
+  conflicting_support_group: { severity: 'Medium', action: 'The same object has different support groups across input rows. Verify the authoritative record.' },
+  conflicting_object_owner: { severity: 'Medium', action: 'The same object has different owners across input rows. Verify the authoritative record.' },
 };
 export const analyse = (records: CsdmRecord[], version: CsdmVersion): Analysis => {
   const findings: Finding[] = [];
@@ -181,6 +186,12 @@ export const analyse = (records: CsdmRecord[], version: CsdmVersion): Analysis =
   const names = new Map<string, Set<string>>();
   const parents = new Map<string, string>();
   const owners = new Map<string, string>();
+  const instanceApplications = new Map<string, string>();
+  const objectSupportGroups = new Map<string, string>();
+  const objectOwners = new Map<string, string>();
+  const hasInstanceSupportData = records.some((r) => normal(r.service_instance_support_group));
+  const hasOfferingSupportData = records.some((r) => normal(r.technology_management_offering_support_group));
+
   const add = (code: string, row: number, entity: string, currentValue: string): void => {
     const rule = guidance[code];
     findings.push({ id: code + ':' + row + ':' + findings.length, code, severity: rule.severity, row,
@@ -193,7 +204,55 @@ export const analyse = (records: CsdmRecord[], version: CsdmVersion): Analysis =
       if (!normal(record[field])) add('missing_' + field, row, LABELS[version][field], '(blank)');
     });
     if (!normal(record.application_owner)) add('missing_application_owner', row, record.business_application, '(blank)');
-    if (!normal(record.support_group)) add('missing_support_group', row, record.technology_management_offering, '(blank)');
+    // Legacy support_group maps to the offering only; Service Instances and Offerings
+    // can legitimately have different support groups and must not be flattened.
+    if (!normal(record.technology_management_offering_support_group) && !normal(record.support_group)) {
+      add(hasOfferingSupportData ? 'missing_technology_management_offering_support_group' : 'missing_support_group',
+        row, record.technology_management_offering, '(blank)');
+    }
+    if (hasInstanceSupportData && normal(record.service_instance) &&
+      !normal(record.service_instance_support_group)) {
+      add('missing_service_instance_support_group', row, record.service_instance, '(blank)');
+    }
+    const instanceId = entityId(record, 'service_instance');
+    const businessApplicationId = entityId(record, 'business_application');
+    if (instanceId && businessApplicationId) {
+      const previous = instanceApplications.get(instanceId);
+      if (previous && previous !== businessApplicationId) {
+        add('multiple_business_applications', row, record.service_instance,
+          'Service Instance linked to more than one Business Application');
+      } else instanceApplications.set(instanceId, businessApplicationId);
+    }
+    // Validate owner and support attributes per object identity, rather than
+    // interpreting different support teams on different object types as conflicts.
+    const supportFields: [EntityKind, string][] = [
+      ['service_instance', record.service_instance_support_group],
+      ['technology_management_offering',
+        record.technology_management_offering_support_group || record.support_group],
+      ['business_offering', record.business_offering_support_group],
+    ];
+    supportFields.forEach(([kind, value]) => {
+      const id = entityId(record, kind);
+      if (!id || !normal(value)) return;
+      const previous = objectSupportGroups.get(id);
+      if (previous && previous !== key(value)) {
+        add('conflicting_support_group', row, record[kind], 'Different support groups for this ' + LABELS[version][kind]);
+      } else objectSupportGroups.set(id, key(value));
+    });
+    const ownerFields: [EntityKind, string][] = [
+      ['service_instance', record.service_instance_owner],
+      ['technology_management_service', record.technology_management_service_owner],
+      ['technology_management_offering', record.technology_management_offering_owner],
+      ['business_offering', record.business_offering_owner],
+    ];
+    ownerFields.forEach(([kind, value]) => {
+      const id = entityId(record, kind);
+      if (!id || !normal(value)) return;
+      const previous = objectOwners.get(id);
+      if (previous && previous !== key(value)) {
+        add('conflicting_object_owner', row, record[kind], 'Different owners for this ' + LABELS[version][kind]);
+      } else objectOwners.set(id, key(value));
+    });
     if (normal(record.business_offering) && !normal(record.business_service)) {
       add('missing_business_service', row, record.business_offering, '(blank)');
     }
