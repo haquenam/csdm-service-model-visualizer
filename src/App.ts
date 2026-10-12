@@ -356,7 +356,7 @@ const App = () => {
     h('header', { className: 'border-b border-slate-800 bg-[#0f2544] text-white', key: 'hero' },
       h('div', { className: 'mx-auto max-w-7xl px-5 py-9 lg:px-8' }, [
         h('div', { className: 'flex flex-wrap items-center justify-between gap-3', key: 'eyebrow' }, [
-          h('p', { className: 'text-xs font-bold uppercase tracking-[.2em] text-sky-200', key: 'v' }, 'CSDM Visualizer / v2.1 development preview'),
+          h('p', { className: 'text-xs font-bold uppercase tracking-[.2em] text-sky-200', key: 'v' }, 'CSDM Visualizer / v2.1.0'),
           h('span', { className: chip + ' border-sky-700 bg-sky-900 text-sky-100', key: 'b' }, 'Browser-only · no backend'),
         ]),
         h('h1', { className: 'mt-4 text-3xl font-semibold tracking-tight sm:text-5xl', key: 'title' }, 'Service architecture, made inspectable.'),
@@ -426,7 +426,7 @@ const App = () => {
                   className: 'rounded bg-white px-2 py-1 text-xs text-slate-700', key: name }, name))),
               h('p', { className: 'mt-3 text-xs leading-5 text-slate-600', key: 'note' },
                 'The four core entity fields determine row completeness. Objects can have distinct support and ownership. Legacy support_group maps to the offering only. Version-specific aliases and optional sys_id columns are supported.'),
-              h('a', { href: 'https://github.com/haquenam/csdm-service-model-visualizer/blob/release/v2.1.0/docs/IMPORT_PREPARATION.md',
+              h('a', { href: 'https://github.com/haquenam/csdm-service-model-visualizer/blob/main/docs/IMPORT_PREPARATION.md',
                 target: '_blank', rel: 'noopener noreferrer', key: 'mapping',
                 className: 'mt-3 inline-block text-xs font-semibold text-blue-700 underline' },
                 'Preparing ServiceNow exports and mapping fields'),
@@ -551,7 +551,7 @@ const App = () => {
       ]) : null,
     ]),
     h('footer', { className: 'border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500', key: 'footer' }, [
-      'CSDM Visualizer v2.1 preview · Built by Enamul Haque · Independent educational tool · ',
+      'CSDM Visualizer v2.1.0 · Built by Enamul Haque · Independent educational tool · ',
       h('a', { href: 'https://github.com/haquenam/csdm-service-model-visualizer',
         target: '_blank', rel: 'noopener noreferrer', className: 'text-blue-700 underline', key: 'github' }, 'GitHub'),
     ]),
