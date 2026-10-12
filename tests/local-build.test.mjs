@@ -23,3 +23,9 @@ test('production bundle carries the application and v2.1 session features', asyn
   assert.match(js, /Uses::Used by/);
   assert.match(js, /Consumes::Consumed by/);
 });
+
+test('PNG consumption caption carries both CSDM 4 and 5 terminology', async () => {
+  const source = await readFile('src/App.ts', 'utf8');
+  assert.match(source, /version === '4' \? 'Application Services' : 'Service Instances'/);
+  assert.match(source, /csdm-v2\.1-diagram\.png/);
+});
