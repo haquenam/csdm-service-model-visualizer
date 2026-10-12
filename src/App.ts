@@ -1,3 +1,4 @@
+import './vendor.js';
 import {
   type CsdmVersion, type ModelView, type RelationshipMode, type CsdmRecord, type Finding, type Graph, type EntityKind,
   FIELDS, CORE_FIELDS, ENTITY_FIELDS, LABELS, expectedHeaders, standardSample, toCsv,
