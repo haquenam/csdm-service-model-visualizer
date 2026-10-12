@@ -1,4 +1,23 @@
-# CSDM Service Model Visualizer v2.0
+# CSDM Service Model Visualizer
+
+> **v2.1 development branch.** The live GitHub Pages application remains v2.0. Do not treat the new model, assessment session and locally bundled frontend as released until browser acceptance, CI checks and an explicit production merge.
+
+## v2.1 changes awaiting acceptance
+
+The release/v2.1.0 branch implements:
+
+- CSDM 5 white-paper Service Offering labels, with backwards-compatible v2.0 header aliases.
+- CSDM 5 **Uses::Used by** or **Consumes::Consumed by** relationship selection, with an EA Workspace compatibility explanation.
+- Service Instance- and Offering-specific support groups and ownership fields; legacy support_group remains an offering fallback.
+- Advisory findings for Service Instances mapped to multiple Business Applications, plus entity-specific owner/support conflicts.
+- New synthetic sample reflecting one Business Application with multiple offerings rather than multiple Business Applications sharing one instance.
+- **Save assessment** and **Resume assessment** using a validated local JSON session file; remediation statuses persist across sessions when exported.
+- Explicit readiness-scoring formula and a three-row/one-Medium finding example in the interface.
+- [ServiceNow import preparation guide](docs/IMPORT_PREPARATION.md), including reference mappings and boundaries of single-flat-CSV support.
+- Bundled React, React Flow, PapaParse and Tailwind resources served from GitHub Pages; no frontend runtime CDNs.
+
+See [v2.1 acceptance plan](docs/V21_ACCEPTANCE.md). Production v2.0 remains unchanged.
+
 
 **An independent, browser-based CSDM architecture and data quality workbench.** Designed for architectural exploration, education and governance conversations. Created by Enamul Haque.
 
@@ -106,6 +125,8 @@ npm run dev
 | v1.1: validation severity and recommendations | Completed |
 | v1.2: CSV template guidance | Completed |
 | v2.0: CSDM 4/5 views, model validation and remediation workbench | Released |
+| v2.1: governance, model accuracy, assessment continuity, local frontend resources | In development |
+| v2.2: native ServiceNow multi-table export preparation and adapters | Planned |
 | Native multi-table ServiceNow adapters | Future |
 | Hierarchical grouping for large graph datasets | Future |
 | Persistent collaboration, AI recommendations and scoped ServiceNow app | Future |
