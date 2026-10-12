@@ -2,10 +2,14 @@
 // Uses stable IDs where supplied, and never treats repeated valid references as duplicates.
 export type CsdmVersion = '4' | '5';
 export type ModelView = 'all' | 'application' | 'delivery' | 'consumption';
+export type RelationshipMode = 'uses' | 'consumes';
 export type Severity = 'High' | 'Medium' | 'Low';
 export type EntityKind = 'business_application' | 'service_instance' | 'technology_management_service' |
   'technology_management_offering' | 'business_service' | 'business_offering';
 export type RecordKey = EntityKind | 'application_owner' | 'service_owner' | 'support_group' |
+  'service_instance_owner' | 'service_instance_support_group' |
+  'technology_management_service_owner' | 'technology_management_offering_owner' |
+  'technology_management_offering_support_group' | 'business_offering_owner' | 'business_offering_support_group' |
   'environment' | 'criticality' | 'business_application_sys_id' | 'service_instance_sys_id' |
   'technology_management_service_sys_id' | 'technology_management_offering_sys_id' |
   'business_service_sys_id' | 'business_offering_sys_id';
@@ -31,7 +35,10 @@ export const CORE_FIELDS: EntityKind[] = [
   'business_application', 'service_instance', 'technology_management_service', 'technology_management_offering',
 ];
 export const FIELDS: RecordKey[] = [
-  ...ENTITY_FIELDS, 'application_owner', 'service_owner', 'support_group', 'environment', 'criticality',
+  ...ENTITY_FIELDS, 'application_owner', 'service_owner', 'support_group',
+  'service_instance_owner', 'service_instance_support_group', 'technology_management_service_owner',
+  'technology_management_offering_owner', 'technology_management_offering_support_group',
+  'business_offering_owner', 'business_offering_support_group', 'environment', 'criticality', 
   'business_application_sys_id', 'service_instance_sys_id',
   'technology_management_service_sys_id', 'technology_management_offering_sys_id',
   'business_service_sys_id', 'business_offering_sys_id',
@@ -52,8 +59,8 @@ export const LABELS: Record<CsdmVersion, Record<EntityKind, string>> = {
   },
   '5': {
     business_application: 'Business Application', service_instance: 'Service Instance',
-    technology_management_service: 'Technology Management Service', technology_management_offering: 'Technology Management Offering',
-    business_service: 'Business Service', business_offering: 'Business Offering',
+    technology_management_service: 'Technology Management Service', technology_management_offering: 'Technology Management Service Offering',
+    business_service: 'Business Service', business_offering: 'Business Service Offering',
   },
 };
 export const HEADERS: Record<CsdmVersion, Record<EntityKind, string>> = {
@@ -64,17 +71,17 @@ export const HEADERS: Record<CsdmVersion, Record<EntityKind, string>> = {
   },
   '5': {
     business_application: 'business_application', service_instance: 'service_instance',
-    technology_management_service: 'technology_management_service', technology_management_offering: 'technology_management_offering',
-    business_service: 'business_service', business_offering: 'business_offering',
+    technology_management_service: 'technology_management_service', technology_management_offering: 'technology_management_service_offering',
+    business_service: 'business_service', business_offering: 'business_service_offering',
   },
 };
 const ALIASES: Record<EntityKind, string[]> = {
   business_application: ['business_application', 'business_app', 'business_application_name'],
   service_instance: ['service_instance', 'application_service', 'application_service_name'],
   technology_management_service: ['technology_management_service', 'technical_service', 'technical_management_service'],
-  technology_management_offering: ['technology_management_offering', 'technical_service_offering', 'technical_management_offering'],
+  technology_management_offering: ['technology_management_service_offering', 'technology_management_offering', 'technical_service_offering', 'technical_management_offering'], 
   business_service: ['business_service'],
-  business_offering: ['business_offering', 'business_service_offering'],
+  business_offering: ['business_service_offering', 'business_offering'], 
 };
 export const normal = (value: unknown): string => String(value ?? '').trim();
 const key = (value: string): string => normal(value).toLocaleLowerCase('en');
@@ -92,11 +99,17 @@ export const standardSample = (): CsdmRecord[] => {
     technology_management_service: 'Web Platform Management', technology_management_offering: 'Web Application Gold',
     business_service: 'Digital Customer Services', business_offering: 'Customer Portal Access',
     application_owner: 'Alex Example', service_owner: 'Morgan Example', support_group: 'Digital Operations',
+    service_instance_owner: 'Morgan Example', service_instance_support_group: 'Digital Operations',
+    technology_management_offering_owner: 'Taylor Example', technology_management_offering_support_group: 'Platform Operations', 
     environment: 'Production', criticality: 'High' };
-  const second = { ...first, business_application: 'Customer Ordering', application_owner: 'Jordan Example' };
+  const second = { ...first, technology_management_offering: 'Web Application Standard',
+    technology_management_offering_support_group: 'Web Support' };
   const third = { ...emptyRecord(), business_application: 'Employee Knowledge', service_instance: 'Knowledge UAT',
     technology_management_service: 'Collaboration Management', technology_management_offering: 'Knowledge Standard',
-    application_owner: 'Sam Example', support_group: 'Collaboration Support', environment: 'UAT', criticality: 'Medium' };
+    application_owner: 'Sam Example', support_group: 'Collaboration Support',
+    service_instance_support_group: 'Collaboration Support',
+    technology_management_offering_support_group: 'Collaboration Support',
+    environment: 'UAT', criticality: 'Medium' };
   return [first, second, third];
 };
 export const toCsv = (rows: CsdmRecord[], version: CsdmVersion): string => {
@@ -133,11 +146,11 @@ export const entityId = (row: CsdmRecord, kind: EntityKind): string => {
   const name = key(row[kind]);
   return stableId ? kind + ':id:' + stableId : name ? kind + ':name:' + name : '';
 };
-export const relationships = (version: CsdmVersion): {
+export const relationships = (version: CsdmVersion, mode: RelationshipMode = 'uses'): {
   from: EntityKind; to: EntityKind; name: string; relationType: 'CMDB' | 'Reference'
 }[] => [
   { from: 'business_application', to: 'service_instance',
-    name: version === '5' ? 'Uses::Used by' : 'Consumes::Consumed by', relationType: 'CMDB' },
+    name: version === '5' && mode === 'uses' ? 'Uses::Used by' : 'Consumes::Consumed by', relationType: 'CMDB' },
   { from: 'technology_management_service', to: 'technology_management_offering',
     name: 'Parent service (reference)', relationType: 'Reference' },
   { from: 'technology_management_offering', to: 'service_instance',
@@ -239,7 +252,8 @@ const POSITION: Record<EntityKind, number> = {
   business_application: 0, service_instance: 340, technology_management_offering: 680,
   technology_management_service: 1020, business_offering: 680, business_service: 1020,
 };
-export const createGraph = (records: CsdmRecord[], version: CsdmVersion, view: ModelView, limit = 120): Graph => {
+export const createGraph = (records: CsdmRecord[], version: CsdmVersion, view: ModelView, limit = 120,
+  mode: RelationshipMode = 'uses'): Graph => {
   const visible: EntityKind[] = view === 'application'
     ? ['business_application', 'service_instance']
     : view === 'delivery' ? ['service_instance', 'technology_management_offering', 'technology_management_service']
@@ -247,7 +261,7 @@ export const createGraph = (records: CsdmRecord[], version: CsdmVersion, view: M
   const nodes = new Map<string, GraphNode>();
   const edges = new Map<string, GraphEdge>();
   const rowsByKind = new Map<EntityKind, number>();
-  const relations = relationships(version);
+  const relations = relationships(version, mode);
   // Position the optional consumer branch immediately after the populated core rows.
   // The previous fixed 640px offset produced a large empty band in small diagrams.
   const coreKinds: EntityKind[] = ['business_application', 'service_instance', 'technology_management_offering', 'technology_management_service'];
