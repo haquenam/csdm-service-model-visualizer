@@ -81,7 +81,7 @@ Duplicate logic distinguishes **exactly repeated rows** from valid repeated enti
 
 ## Security and data safety
 
-CSV processing takes place inside your browser without a backend, authentication, database or ServiceNow API connection. The project does not intentionally transmit uploaded data to GitHub or any server. Browser resources are served from public CDNs.
+CSV processing takes place inside your browser without a backend, authentication, database or ServiceNow API connection. The project does not intentionally transmit uploaded data to GitHub or any server. Published v2.0 loads some libraries from public CDNs; the v2.1 development branch instead bundles application scripts and styles locally.
 
 **Use only synthetic or suitably anonymised data. Do not use client, production, confidential, personal, regulated or sensitive records.** Exported reports are saved locally, and remediation-status edits are not persisted after the session.
 
