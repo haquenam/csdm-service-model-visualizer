@@ -88,7 +88,8 @@ const pngExport = (sourceGraph: Graph, version: CsdmVersion, view: ModelView,
     section.setAttribute('font-family', 'Arial, sans-serif');
     section.setAttribute('font-weight', 'bold');
     section.setAttribute('fill', '#315a7d');
-    section.textContent = 'SERVICE CONSUMPTION | Service Instances are repeated for readability (not additional CIs)';
+    section.textContent = 'SERVICE CONSUMPTION | ' + (version === '4' ? 'Application Services' : 'Service Instances') +
+      ' are repeated for readability (not additional CIs)';
     svg.appendChild(section);
   }
   const routes = calculatePngRoutes(graph);
@@ -188,7 +189,7 @@ const pngExport = (sourceGraph: Graph, version: CsdmVersion, view: ModelView,
         const url = URL.createObjectURL(result);
         const anchor = document.createElement('a');
         anchor.href = url;
-        anchor.download = 'csdm-v2-diagram.png';
+        anchor.download = 'csdm-v2.1-diagram.png';
         anchor.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 500);
       }, 'image/png');
